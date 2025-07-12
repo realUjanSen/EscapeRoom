@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiplayer Escape Room</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div id="menu" class="screen active">
+        <div class="menu-container">
+            <h1>🔐 Multiplayer Escape Room</h1>
+            <div class="menu-content">
+                <input type="text" id="playerName" placeholder="Enter your name" maxlength="20">
+                <div class="menu-buttons">
+                    <button id="createRoomBtn" class="btn primary">Create Room</button>
+                    <div class="join-room">
+                        <input type="text" id="roomId" placeholder="Room ID" maxlength="8">
+                        <button id="joinRoomBtn" class="btn secondary">Join Room</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="lobby" class="screen">
+        <div class="lobby-container">
+            <h2>Room: <span id="roomIdDisplay"></span></h2>
+            <div class="lobby-content">
+                <div class="players-list">
+                    <h3>Players in Room:</h3>
+                    <ul id="playersList"></ul>
+                </div>
+                <div class="lobby-controls">
+                    <button id="startGameBtn" class="btn primary">Start Game</button>
+                    <button id="leaveLobbyBtn" class="btn secondary">Leave Room</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="game" class="screen">
+        <div class="game-container">
+            <div class="game-header">
+                <div class="timer">Time: <span id="gameTimer">00:00</span></div>
+                <div class="players-online">
+                    Players: <span id="playersOnline">0</span>
+                </div>
+            </div>
+            
+            <div class="game-area">
+                <canvas id="gameCanvas" width="800" height="600"></canvas>
+                
+                <div class="game-ui">
+                    <div class="inventory">
+                        <h4>Inventory</h4>
+                        <div id="inventoryItems"></div>
+                    </div>
+                    
+                    <div class="clues">
+                        <h4>Clues Found</h4>
+                        <div id="cluesFound"></div>
+                    </div>
+                    
+                    <div class="chat">
+                        <div id="chatMessages"></div>
+                        <div class="chat-input">
+                            <input type="text" id="chatInput" placeholder="Type a message...">
+                            <button id="sendChatBtn">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="game-controls">
+                <button id="leaveGameBtn" class="btn secondary">Leave Game</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="gameComplete" class="screen">
+        <div class="complete-container">
+            <h1>🎉 Escape Successful!</h1>
+            <div class="completion-stats">
+                <p>Time: <span id="completionTime"></span></p>
+                <p>Team: <span id="teamPlayers"></span></p>
+            </div>
+            <button id="playAgainBtn" class="btn primary">Play Again</button>
+        </div>
+    </div>
+
+    <script src="js/game.js"></script>
+    <script src="js/websocket.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

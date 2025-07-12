@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: white;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #333;
+            border-radius: 8px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background: #2d5a27; }
+        .error { background: #5a2727; }
+        .warning { background: #5a5527; }
+    </style>
+</head>
+<body>
+    <h1>🔐 Escape Room - System Test</h1>
+    
+    <div class="test-section">
+        <h2>1. Network Interface Test</h2>
+        <div id="network-status" class="status warning">Testing...</div>
+        <div id="network-interfaces"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. WebSocket Server Test</h2>
+        <div id="websocket-status" class="status warning">Testing...</div>
+        <div id="websocket-details"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. Game Interface Test</h2>
+        <a href="/escape.html" style="color: #4ecdc4;">Open Main Game Interface</a>
+    </div>
+
+    <script>
+        // Test network interfaces
+        async function testNetworkInterfaces() {
+            try {
+                const response = await fetch('/backend/network.php?action=get_interfaces');
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('network-status').className = 'status success';
+                    document.getElementById('network-status').textContent = '✅ Network interface detection working';
+                    document.getElementById('network-interfaces').innerHTML = 
+                        '<h3>Available Interfaces:</h3>' +
+                        data.interfaces.map(iface => `<div>• ${iface.name}: ${iface.address}</div>`).join('');
+                } else {
+                    throw new Error(data.message || 'Unknown error');
+                }
+            } catch (error) {
+                document.getElementById('network-status').className = 'status error';
+                document.getElementById('network-status').textContent = '❌ Network interface test failed: ' + error.message;
+            }
+        }
+
+        // Test WebSocket connection
+        function testWebSocket() {
+            const wsUrl = 'ws://localhost:8080';
+            const ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                document.getElementById('websocket-status').className = 'status success';
+                document.getElementById('websocket-status').textContent = '✅ WebSocket connection successful';
+                document.getElementById('websocket-details').innerHTML = 
+                    '<div>Connected to: ' + wsUrl + '</div>' +
+                    '<div>Ready for multiplayer communication</div>';
+                ws.close();
+            };
+            
+            ws.onerror = (error) => {
+                document.getElementById('websocket-status').className = 'status error';
+                document.getElementById('websocket-status').textContent = '❌ WebSocket connection failed';
+                document.getElementById('websocket-details').innerHTML = 
+                    '<div>Error connecting to: ' + wsUrl + '</div>' +
+                    '<div>Make sure the WebSocket server is running on port 8080</div>';
+            };
+            
+            ws.onclose = (event) => {
+                if (event.code !== 1000) {
+                    document.getElementById('websocket-status').className = 'status error';
+                    document.getElementById('websocket-status').textContent = '❌ WebSocket connection closed unexpectedly';
+                }
+            };
+        }
+
+        // Run tests
+        testNetworkInterfaces();
+        testWebSocket();
+    </script>
+</body>
+</html>

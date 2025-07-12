@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔐 Multiplayer Escape Room</title>
+    <link rel="stylesheet" href="frontend/css/styles.css">
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="nav-left">
+            <button id="ipConfigBtn" class="nav-btn ip-config-btn">
+                🌐 IPCONFIG
+            </button>
+            <div id="ipDropdown" class="ip-dropdown hidden">
+                <div class="ip-header">
+                    <strong>Select Network Adapter:</strong>
+                    <button id="refreshIp" class="refresh-btn">🔄</button>
+                </div>
+                <div id="ipList" class="ip-list">
+                    <div class="loading">Loading network interfaces...</div>
+                </div>
+                <div class="share-section">
+                    <label>Share this link:</label>
+                    <input type="text" id="shareUrl" readonly class="share-input">
+                    <button id="copyUrl" class="copy-btn">📋 Copy</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="nav-center">
+            <h1 class="game-title">🔐 Escape Room</h1>
+        </div>
+        
+        <div class="nav-right">
+            <button id="fullscreenBtn" class="nav-btn fullscreen-btn">⛶ Fullscreen</button>
+            <button id="settingsBtn" class="nav-btn">⚙️</button>
+        </div>
+    </nav>
+
+    <!-- Main Content Screens -->
+    <div id="menuScreen" class="screen active">
+        <div class="menu-container">
+            <div class="logo-section">
+                <h1 class="main-title">🔐 Multiplayer Escape Room</h1>
+                <p class="subtitle">Work together to solve puzzles and escape!</p>
+            </div>
+            
+            <div class="player-input">
+                <input type="text" id="playerName" placeholder="Enter your name (optional)" maxlength="20">
+            </div>
+            
+            <div class="menu-actions">
+                <button id="createRoomBtn" class="btn btn-primary">
+                    <span class="btn-icon">➕</span>
+                    Create Room
+                </button>
+                
+                <div class="join-section">
+                    <input type="text" id="roomCode" placeholder="Room Code (6 digits)" maxlength="6" pattern="[A-Z0-9]{6}">
+                    <button id="joinRoomBtn" class="btn btn-secondary">
+                        <span class="btn-icon">🚪</span>
+                        Join Room
+                    </button>
+                </div>
+                
+                <button id="quickJoinBtn" class="btn btn-accent">
+                    <span class="btn-icon">⚡</span>
+                    Quick Join (Random Room)
+                </button>
+            </div>
+            
+            <div class="room-list-section">
+                <h3>Public Rooms</h3>
+                <div id="publicRooms" class="public-rooms">
+                    <div class="loading">Loading available rooms...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lobby Screen -->
+    <div id="lobbyScreen" class="screen">
+        <div class="lobby-container">
+            <div class="room-info">
+                <h2>Room: <span id="roomCodeDisplay" class="room-code"></span></h2>
+                <div class="room-share">
+                    <input type="text" id="roomShareUrl" readonly class="share-input">
+                    <button id="copyRoomUrl" class="copy-btn">📋 Copy Link</button>
+                </div>
+            </div>
+            
+            <div class="lobby-content">
+                <div class="players-section">
+                    <h3>Players (<span id="playerCount">0</span>/4)</h3>
+                    <div id="playersList" class="players-list"></div>
+                </div>
+                
+                <div class="game-settings" id="hostControls">
+                    <h3>Game Settings (Host Only)</h3>
+                    <div class="setting-group">
+                        <label>Time Limit:</label>
+                        <select id="timeLimit">
+                            <option value="1800">30 minutes</option>
+                            <option value="2700">45 minutes</option>
+                            <option value="3600" selected>60 minutes</option>
+                            <option value="0">No limit</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label>Difficulty:</label>
+                        <select id="difficulty">
+                            <option value="easy">Easy</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="hard">Hard</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="lobby-actions">
+                    <button id="startGameBtn" class="btn btn-primary" disabled>
+                        🚀 Start Game
+                    </button>
+                    <button id="leaveLobbyBtn" class="btn btn-secondary">
+                        ← Leave Room
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="gameScreen" class="screen">
+        <div class="game-header">
+            <div class="game-info">
+                <span class="timer">⏱️ <span id="gameTimer">30:00</span></span>
+                <span class="players-online">👥 <span id="onlineCount">1</span></span>
+                <span class="room-code-small">Room: <span id="gameRoomCode"></span></span>
+            </div>
+            <div class="game-controls">
+                <button id="pauseBtn" class="control-btn">⏸️</button>
+                <button id="helpBtn" class="control-btn">❓</button>
+                <button id="leaveGameBtn" class="control-btn">🚪</button>
+            </div>
+        </div>
+        
+        <div class="game-main">
+            <div class="game-world-container">
+                <div id="gameWorld" class="game-world">
+                    <!-- Game objects will be dynamically created here as HTML elements -->
+                </div>
+                
+                <!-- Mobile Controls -->
+                <div class="mobile-controls" id="mobileControls">
+                    <div class="d-pad">
+                        <button class="d-btn d-up" data-key="w">↑</button>
+                        <button class="d-btn d-left" data-key="a">←</button>
+                        <button class="d-btn d-right" data-key="d">→</button>
+                        <button class="d-btn d-down" data-key="s">↓</button>
+                    </div>
+                    <div class="action-buttons">
+                        <button class="action-btn interact-btn" data-key="e">E<br><small>Interact</small></button>
+                        <button class="action-btn inventory-btn" data-key="i">📦<br><small>Items</small></button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="game-sidebar">
+                <div class="inventory-panel">
+                    <h4>🎒 Inventory</h4>
+                    <div id="inventoryGrid" class="inventory-grid"></div>
+                </div>
+                
+                <div class="clues-panel">
+                    <h4>🔍 Clues Found</h4>
+                    <div id="cluesList" class="clues-list"></div>
+                </div>
+                
+                <div class="chat-panel">
+                    <h4>💬 Team Chat</h4>
+                    <div id="chatMessages" class="chat-messages"></div>
+                    <div class="chat-input-group">
+                        <input type="text" id="chatInput" placeholder="Type a message..." maxlength="200">
+                        <button id="sendChatBtn">📤</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Interaction Modal -->
+    <div id="interactionModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="interactionTitle">Object Interaction</h3>
+                <button id="closeModal" class="close-btn">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="interactionContent"></div>
+            </div>
+            <div class="modal-actions">
+                <button id="modalAction" class="btn btn-primary">Interact</button>
+                <button id="cancelModal" class="btn btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Complete Screen -->
+    <div id="completeScreen" class="screen">
+        <div class="complete-container">
+            <div class="success-animation">🎉</div>
+            <h1>Escape Successful!</h1>
+            <div class="completion-stats">
+                <div class="stat">
+                    <span class="stat-label">Time:</span>
+                    <span id="completionTime" class="stat-value">--:--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Team:</span>
+                    <span id="teamMembers" class="stat-value">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Clues Found:</span>
+                    <span id="cluesFound" class="stat-value">--</span>
+                </div>
+            </div>
+            <div class="complete-actions">
+                <button id="playAgainBtn" class="btn btn-primary">🔄 Play Again</button>
+                <button id="shareResultBtn" class="btn btn-secondary">📤 Share Result</button>
+                <button id="homeBtn" class="btn btn-accent">🏠 Home</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading/Connection Screen -->
+    <div id="loadingScreen" class="screen loading-screen">
+        <div class="loading-container">
+            <div class="spinner"></div>
+            <h2 id="loadingText">Connecting to server...</h2>
+            <p id="loadingSubtext">Please wait while we establish connection</p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="frontend/js/networking.js"></script>
+    <script src="frontend/js/websocket.js"></script>
+    <script src="frontend/js/game.js"></script>
+    <script src="frontend/js/ui.js"></script>
+    <script>
+        // Initialize the application
+        let game, ui, networking;
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🎮 Escape Room - Application Starting...');
+            
+            // Initialize game
+            game = new EscapeRoomGame();
+            
+            // Initialize UI manager
+            ui = new UIManager(game);
+            ui.init();
+            
+            // Try to reconnect to existing session first
+            if (game.tryReconnectSession()) {
+                console.log('💾 Attempting session reconnection...');
+                // Initialize networking even during reconnection
+                networkManager.init().then(() => {
+                    console.log('Networking initialized during reconnection');
+                }).catch(error => {
+                    console.error('Failed to initialize networking during reconnection:', error);
+                });
+            } else {
+                console.log('💾 No session to reconnect, initializing normally');
+                // Initialize networking using the global networkManager
+                networkManager.init().then(() => {
+                    console.log('Networking initialized');
+                }).catch(error => {
+                    console.error('Failed to initialize networking:', error);
+                });
+            }
+            
+            // Make globally accessible for debugging
+            window.game = game;
+            window.ui = ui;
+            window.networking = networkManager;
+        });
+    </script>
+</body>
+</html>

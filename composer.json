@@ -1,0 +1,14 @@
+{
+    "name": "escape-room/multiplayer-game",
+    "description": "PHP backend components for the multiplayer escape room game",
+    "require": {
+        "php": ">=8.0",
+        "ratchet/pawl": "^0.4",
+        "react/socket": "^1.12"
+    },
+    "autoload": {
+        "psr-4": {
+            "EscapeRoom\\": "server/php/src/"
+        }
+    }
+}
