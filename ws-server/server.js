@@ -239,7 +239,14 @@ wss.on('connection', (ws, req) => {
                     roomCode,
                     playerId,
                     isHost: true,
-                    room: room.getPublicData()
+                    playerName: playerName,
+                    room: room.getPublicData(),
+                    players: Array.from(room.players.values()).map(p => ({
+                        playerId: p.playerId,
+                        name: p.name,
+                        position: p.position,
+                        isHost: p.isHost
+                    }))
                 }
             }));
 

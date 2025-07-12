@@ -240,6 +240,9 @@ class EscapeRoomGame {
     async createRoom(playerName, isPrivate = false) {
         console.log(`🔍 DEBUG: createRoom called with playerName: ${playerName}, isPrivate: ${isPrivate}`);
         
+        // Clear any existing players from previous sessions
+        this.players.clear();
+        
         // Check if WebSocket exists and is connected
         console.log(`🔍 DEBUG: Pre-check - wsClient exists: ${!!this.wsClient}`);
         console.log(`🔍 DEBUG: Pre-check - wsClient.ws exists: ${this.wsClient && !!this.wsClient.ws}`);
@@ -303,6 +306,9 @@ class EscapeRoomGame {
             this.showError('Not connected to server');
             return;
         }
+
+        // Clear any existing players from previous sessions
+        this.players.clear();
 
         this.sendMessage('join_room', {
             roomCode: roomCode.toUpperCase(),
@@ -646,19 +652,22 @@ class EscapeRoomGame {
     handleRoomCreated(data) {
         console.log(`🔍 DEBUG: handleRoomCreated called with data:`, data);
         
+        // Clear any existing players from previous sessions
+        this.players.clear();
+        
         this.roomCode = data.roomCode;
         this.playerId = data.playerId;
         this.isHost = data.isHost;
         
-        // Add the host (current player) to the players map
-        this.players.set(this.playerId, {
-            playerId: this.playerId,
-            name: data.playerName || 'Host',
-            position: { x: 100, y: 100 },
-            isHost: this.isHost
-        });
+        // Add players from server data (should include the host)
+        if (data.players && Array.isArray(data.players)) {
+            data.players.forEach(player => {
+                this.players.set(player.playerId, player);
+            });
+        }
         
         console.log(`🔍 DEBUG: Room created - roomCode: ${this.roomCode}, playerId: ${this.playerId}, isHost: ${this.isHost}`);
+        console.log(`🔍 DEBUG: Players in room:`, this.players.size);
         
         // Save session data
         this.saveSessionData();
@@ -672,6 +681,9 @@ class EscapeRoomGame {
     }
 
     handleRoomJoined(data) {
+        // Clear any existing players from previous sessions
+        this.players.clear();
+        
         this.roomCode = data.roomCode;
         this.playerId = data.playerId;
         this.isHost = data.isHost;
@@ -1111,18 +1123,10 @@ class EscapeRoomGame {
         
         console.log('💾 Attempting to reconnect to session:', sessionData);
         
-        // Set the player data
+        // Set the player data but DON'T add to players map yet - let server do that
         this.roomCode = sessionData.roomCode;
         this.playerId = sessionData.playerId;
         this.isHost = sessionData.isHost;
-        
-        // Add player to players map
-        this.players.set(this.playerId, {
-            playerId: this.playerId,
-            name: sessionData.playerName,
-            position: { x: 100, y: 100 },
-            isHost: this.isHost
-        });
         
         // Connect to WebSocket and rejoin room
         this.wsClient.connect('localhost').then(() => {

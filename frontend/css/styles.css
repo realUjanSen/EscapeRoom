@@ -685,7 +685,7 @@ body {
     box-shadow: 0 0 15px rgba(52, 152, 219, 0.6);
 }
 
-.player-name {
+.game-area .player-name {
     position: absolute;
     top: -25px;
     left: 50%;
