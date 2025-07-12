@@ -620,9 +620,9 @@ class EscapeRoomGame {
         // Show share link
         this.showShareLink();
         
-        // Switch to game view
-        console.log(`🔍 DEBUG: Switching to game view...`);
-        this.switchToGameView();
+        // Switch to lobby view instead of game view
+        console.log(`🔍 DEBUG: Switching to lobby view...`);
+        this.switchToLobbyView();
     }
 
     handleRoomJoined(data) {
@@ -638,7 +638,8 @@ class EscapeRoomGame {
         // Save session data
         this.saveSessionData();
         
-        this.switchToGameView();
+        // Switch to lobby view instead of game view
+        this.switchToLobbyView();
     }
 
     handlePlayerJoined(data) {
@@ -650,11 +651,23 @@ class EscapeRoomGame {
         });
         
         this.showNotification(`${data.name} joined the room`);
+        
+        // Update lobby if we're in lobby view
+        if (document.getElementById('lobbyScreen').style.display !== 'none') {
+            this.updatePlayersList();
+            this.updateStartGameButton();
+        }
     }
 
     handlePlayerLeft(data) {
         this.players.delete(data.playerId);
         this.showNotification(`${data.playerName} left the room`);
+        
+        // Update lobby if we're in lobby view
+        if (document.getElementById('lobbyScreen').style.display !== 'none') {
+            this.updatePlayersList();
+            this.updateStartGameButton();
+        }
     }
 
     handlePlayerMoved(data) {
@@ -672,6 +685,9 @@ class EscapeRoomGame {
     handleGameStarted(data) {
         this.gameStarted = true;
         this.showNotification('Game started!', 'success');
+        
+        // Switch from lobby to game view
+        this.switchToGameView();
         
         // Initialize game objects (can be loaded from server or predefined)
         this.initializeGameObjects();
@@ -747,103 +763,203 @@ class EscapeRoomGame {
         this.setupChatControls();
     }
 
-    toggleGameMenu() {
-        const gameMenu = document.getElementById('game-menu');
-        if (gameMenu) {
-            gameMenu.style.display = gameMenu.style.display === 'none' ? 'block' : 'none';
-        }
-    }
-
-    showError(message) {
-        console.error('Game error:', message);
+    switchToLobbyView() {
+        console.log(`🔍 DEBUG: switchToLobbyView called`);
         
-        // Show in UI
-        const errorElement = document.getElementById('error-message');
-        if (errorElement) {
-            errorElement.textContent = message;
-            errorElement.style.display = 'block';
-        }
-    }
-
-    hideError() {
-        const errorElement = document.getElementById('error-message');
-        if (errorElement) {
-            errorElement.style.display = 'none';
-        }
-    }
-
-    showNotification(message, type = 'info') {
-        console.log(`Notification (${type}):`, message);
+        // Hide all screens
+        document.querySelectorAll('.screen').forEach(screen => {
+            screen.style.display = 'none';
+        });
         
-        // Create notification element
-        const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
-        notification.textContent = message;
-        
-        document.body.appendChild(notification);
-        
-        // Auto remove after 3 seconds
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        }, 3000);
-    }
-
-    addChatMessage(playerName, message, timestamp) {
-        const chatContainer = document.getElementById('chatMessages');
-        if (!chatContainer) {
-            console.error('📱 Chat container not found (ID: chatMessages)');
+        // Show lobby screen
+        const lobbyScreen = document.getElementById('lobbyScreen');
+        if (lobbyScreen) {
+            lobbyScreen.style.display = 'block';
+        } else {
+            console.error('Lobby screen not found!');
             return;
         }
         
-        const messageElement = document.createElement('div');
-        messageElement.className = 'chat-message';
+        // Update lobby UI
+        this.updateLobbyUI();
         
-        const timeStr = new Date(timestamp).toLocaleTimeString();
-        messageElement.innerHTML = `<span class="player-name">${playerName}:</span> ${message} <span class="timestamp">${timeStr}</span>`;
-        
-        chatContainer.appendChild(messageElement);
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-        
-        console.log('📱 Chat message added:', { playerName, message });
+        // Setup lobby event listeners
+        this.setupLobbyEventListeners();
     }
 
-    initializeGameObjects() {
-        // Clear all existing objects - start fresh with empty world
-        this.gameObjects.clear();
-        console.log(`🎮 Game world cleared - starting fresh with just the player dot`);
+    updateLobbyUI() {
+        console.log(`🔍 DEBUG: updateLobbyUI called`);
+        
+        // Update room code display
+        const roomCodeDisplay = document.getElementById('roomCodeDisplay');
+        if (roomCodeDisplay) {
+            roomCodeDisplay.textContent = this.roomCode;
+        }
+        
+        // Update game room code display
+        const gameRoomCode = document.getElementById('gameRoomCode');
+        if (gameRoomCode) {
+            gameRoomCode.textContent = this.roomCode;
+        }
+        
+        // Update share URL
+        this.updateShareURL();
+        
+        // Update players list
+        this.updatePlayersList();
+        
+        // Show/hide host controls
+        const hostControls = document.getElementById('hostControls');
+        if (hostControls) {
+            hostControls.style.display = this.isHost ? 'block' : 'none';
+        }
+        
+        // Enable/disable start game button
+        this.updateStartGameButton();
     }
 
-    setupChatControls() {
-        const chatInput = document.getElementById('chatInput');
-        const sendChatBtn = document.getElementById('sendChatBtn');
+    updatePlayersList() {
+        const playersList = document.getElementById('playersList');
+        const playerCount = document.getElementById('playerCount');
         
-        if (chatInput && sendChatBtn) {
-            console.log('📱 Setting up chat controls');
+        if (!playersList || !playerCount) return;
+        
+        // Clear existing list
+        playersList.innerHTML = '';
+        
+        // Start with connected players
+        const allPlayers = new Map(this.players);
+        
+        // Add current player if not already in the map
+        if (!allPlayers.has(this.playerId) && this.playerId) {
+            allPlayers.set(this.playerId, {
+                playerId: this.playerId,
+                name: 'You',
+                isHost: this.isHost
+            });
+        }
+        
+        // Convert to array and sort (host first)
+        const playersArray = Array.from(allPlayers.values()).sort((a, b) => {
+            if (a.isHost && !b.isHost) return -1;
+            if (!a.isHost && b.isHost) return 1;
+            return 0;
+        });
+        
+        playersArray.forEach(player => {
+            const playerElement = document.createElement('div');
+            playerElement.className = 'player-item';
             
-            // Remove any existing listeners
-            chatInput.removeEventListener('keypress', this.handleChatKeypress);
-            sendChatBtn.removeEventListener('click', this.handleChatSend);
+            const isCurrentPlayer = player.playerId === this.playerId;
+            const playerName = isCurrentPlayer ? 'You' : player.name;
+            const hostBadge = player.isHost ? ' 👑' : '';
             
-            // Add new listeners
-            this.handleChatKeypress = (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    this.sendChatMessage();
-                }
-            };
+            playerElement.innerHTML = `
+                <span class="player-name">${playerName}${hostBadge}</span>
+                <span class="player-status">Ready</span>
+            `;
             
-            this.handleChatSend = () => {
-                this.sendChatMessage();
-            };
+            if (isCurrentPlayer) {
+                playerElement.classList.add('current-player');
+            }
             
-            chatInput.addEventListener('keypress', this.handleChatKeypress);
-            sendChatBtn.addEventListener('click', this.handleChatSend);
-            
-            console.log('📱 Chat controls set up successfully');
+            playersList.appendChild(playerElement);
+        });
+        
+        // Update player count
+        playerCount.textContent = allPlayers.size;
+    }
+
+    updateStartGameButton() {
+        const startGameBtn = document.getElementById('startGameBtn');
+        if (!startGameBtn) return;
+        
+        // Only host can start the game
+        if (!this.isHost) {
+            startGameBtn.style.display = 'none';
+            return;
+        }
+        
+        startGameBtn.style.display = 'block';
+        
+        // Need at least 1 player to start (just the host is fine for testing)
+        const playerCount = this.players.size + 1; // +1 for current player
+        startGameBtn.disabled = playerCount < 1;
+        
+        if (playerCount >= 1) {
+            startGameBtn.textContent = `🚀 Start Game (${playerCount} player${playerCount > 1 ? 's' : ''})`;
         } else {
-            console.error('📱 Chat input or send button not found');
+            startGameBtn.textContent = '🚀 Waiting for players...';
+        }
+    }
+
+    updateShareURL() {
+        const shareUrlInput = document.getElementById('roomShareUrl');
+        if (!shareUrlInput || !this.roomCode) return;
+        
+        const currentUrl = window.location.href;
+        const baseUrl = currentUrl.split('?')[0];
+        const shareUrl = `${baseUrl}?room=${this.roomCode}`;
+        
+        shareUrlInput.value = shareUrl;
+    }
+
+    setupLobbyEventListeners() {
+        console.log(`🔍 DEBUG: setupLobbyEventListeners called`);
+        
+        // Start game button
+        const startGameBtn = document.getElementById('startGameBtn');
+        if (startGameBtn) {
+            startGameBtn.removeEventListener('click', this.handleStartGame.bind(this));
+            startGameBtn.addEventListener('click', this.handleStartGame.bind(this));
+        }
+        
+        // Leave lobby button
+        const leaveLobbyBtn = document.getElementById('leaveLobbyBtn');
+        if (leaveLobbyBtn) {
+            leaveLobbyBtn.removeEventListener('click', this.handleLeaveLobby.bind(this));
+            leaveLobbyBtn.addEventListener('click', this.handleLeaveLobby.bind(this));
+        }
+        
+        // Copy room URL button
+        const copyRoomUrlBtn = document.getElementById('copyRoomUrl');
+        if (copyRoomUrlBtn) {
+            copyRoomUrlBtn.removeEventListener('click', this.handleCopyRoomUrl.bind(this));
+            copyRoomUrlBtn.addEventListener('click', this.handleCopyRoomUrl.bind(this));
+        }
+    }
+
+    handleStartGame() {
+        if (!this.isHost || !this.isConnectedToServer()) return;
+        
+        console.log('Starting game...');
+        this.sendMessage('game_start', {
+            timeLimit: document.getElementById('timeLimit')?.value || 3600,
+            difficulty: document.getElementById('difficulty')?.value || 'medium'
+        });
+    }
+
+    handleLeaveLobby() {
+        if (confirm('Are you sure you want to leave the room?')) {
+            this.leaveRoom();
+        }
+    }
+
+    handleCopyRoomUrl() {
+        const shareUrlInput = document.getElementById('roomShareUrl');
+        if (shareUrlInput) {
+            shareUrlInput.select();
+            document.execCommand('copy');
+            
+            // Show feedback
+            const copyBtn = document.getElementById('copyRoomUrl');
+            if (copyBtn) {
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = '✓ Copied!';
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                }, 2000);
+            }
         }
     }
     
@@ -1037,6 +1153,46 @@ class EscapeRoomGame {
 
     disconnect() {
         this.wsClient.disconnect();
+    }
+
+    // UI and Notification Methods
+    showNotification(message, type = 'info') {
+        console.log(`🔔 ${type.toUpperCase()}: ${message}`);
+        
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.textContent = message;
+        
+        // Add to page
+        document.body.appendChild(notification);
+        
+        // Auto-remove after 3 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 3000);
+        
+        // Also show in any existing notification areas
+        const notificationArea = document.getElementById('notifications');
+        if (notificationArea) {
+            const notifElement = document.createElement('div');
+            notifElement.className = `notification ${type}`;
+            notifElement.textContent = message;
+            notificationArea.appendChild(notifElement);
+            
+            setTimeout(() => {
+                if (notifElement.parentNode) {
+                    notifElement.parentNode.removeChild(notifElement);
+                }
+            }, 3000);
+        }
+    }
+
+    showError(message) {
+        this.showNotification(message, 'error');
+        console.error('Game Error:', message);
     }
 }
 

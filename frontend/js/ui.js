@@ -249,7 +249,7 @@ class UIManager {
     
     joinRoom(roomCode, playerName) {
         // Use selected IP or default to current hostname for LAN
-        const selectedIP = networking.selectedIP || window.location.hostname;
+        const selectedIP = (window.networking && window.networking.selectedIP) || window.location.hostname;
         
         // Connect to game server and join room
         if (!this.game.isConnectedToServer()) {
@@ -265,7 +265,7 @@ class UIManager {
     
     async findAndJoinPublicRoom(playerName) {
         try {
-            const selectedIP = networking.selectedIP || window.location.hostname;
+            const selectedIP = (window.networking && window.networking.selectedIP) || window.location.hostname;
             const response = await fetch(`http://${selectedIP}:8080/api/rooms`);
             const data = await response.json();
             
@@ -301,7 +301,7 @@ class UIManager {
         }
 
         // Use selected IP or default to current hostname for LAN
-        const selectedIP = networking.selectedIP || window.location.hostname;
+        const selectedIP = (window.networking && window.networking.selectedIP) || window.location.hostname;
 
         // Connect to server if not already connected
         if (!this.game.isConnectedToServer()) {
@@ -332,7 +332,7 @@ class UIManager {
         }
 
         // Use selected IP or default to current hostname for LAN
-        const selectedIP = this.game.getSelectedIP() || window.location.hostname;
+        const selectedIP = (window.networking && window.networking.selectedIP) || window.location.hostname;
 
         // Connect to server if not already connected, then join room
         if (!this.game.isConnectedToServer()) {

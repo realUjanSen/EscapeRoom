@@ -216,7 +216,8 @@ wss.on('connection', (ws, req) => {
             roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
         } while (rooms.has(roomCode));
 
-        const playerId = `player_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        // Set connection-scope variables
+        playerId = `player_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         
         const room = new GameRoom(roomCode, playerId, isPrivate);
         const playerData = {
@@ -228,6 +229,9 @@ wss.on('connection', (ws, req) => {
         if (room.addPlayer(playerId, playerData)) {
             rooms.set(roomCode, room);
             players.set(ws, { playerId, roomCode });
+            
+            // Set current room for this connection
+            currentRoom = roomCode;
 
             ws.send(JSON.stringify({
                 type: 'room_created',

@@ -48,7 +48,10 @@
             </div>
             
             <div class="player-input">
-                <input type="text" id="playerName" placeholder="Enter your name (optional)" maxlength="20">
+                <div class="name-input-section">
+                    <input type="text" id="playerName" placeholder="Your name (auto-generated)" maxlength="20">
+                    <button id="randomNameBtn" class="btn btn-small" title="Generate new random name">🎲</button>
+                </div>
             </div>
             
             <div class="menu-actions">
@@ -275,15 +278,86 @@
                 // Initialize networking using the global networkManager
                 networkManager.init().then(() => {
                     console.log('Networking initialized');
+                    
+                    // Check for room code in URL and auto-join
+                    checkForAutoJoin();
                 }).catch(error => {
                     console.error('Failed to initialize networking:', error);
                 });
+            }
+            
+            // Check for room code in URL parameters
+            function checkForAutoJoin() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const roomCode = urlParams.get('room');
+                
+                if (roomCode) {
+                    console.log(`🔗 Found room code in URL: ${roomCode}`);
+                    
+                    // Generate random 3-letter name
+                    const randomName = generateRandomName();
+                    
+                    // Fill in the main menu inputs
+                    const joinRoomInput = document.getElementById('roomCode');
+                    const playerNameInput = document.getElementById('playerName');
+                    
+                    if (joinRoomInput) {
+                        joinRoomInput.value = roomCode.toUpperCase();
+                    }
+                    
+                    if (playerNameInput) {
+                        playerNameInput.value = randomName;
+                    }
+                    
+                    // Auto-join after a brief delay to ensure UI is ready
+                    setTimeout(() => {
+                        if (game && typeof game.connect === 'function') {
+                            const selectedIP = (window.networking && window.networking.selectedIP) || window.location.hostname;
+                            game.connect(selectedIP).then(() => {
+                                game.joinRoom(roomCode.toUpperCase(), randomName);
+                            }).catch(error => {
+                                console.error('Auto-join failed:', error);
+                                ui.showError('Failed to auto-join room: ' + (error.message || error));
+                            });
+                        }
+                    }, 1000);
+                }
+            }
+            
+            // Generate random 3-letter name
+            function generateRandomName() {
+                const consonants = 'BCDFGHJKLMNPQRSTVWXYZ';
+                const vowels = 'AEIOU';
+                
+                // Pattern: Consonant-Vowel-Consonant for readable names
+                const name = consonants[Math.floor(Math.random() * consonants.length)] +
+                           vowels[Math.floor(Math.random() * vowels.length)] +
+                           consonants[Math.floor(Math.random() * consonants.length)];
+                
+                return name;
             }
             
             // Make globally accessible for debugging
             window.game = game;
             window.ui = ui;
             window.networking = networkManager;
+            
+            // Add random name button functionality
+            const randomNameBtn = document.getElementById('randomNameBtn');
+            const playerNameInput = document.getElementById('playerName');
+            
+            // Auto-generate name on page load
+            if (playerNameInput && !playerNameInput.value) {
+                playerNameInput.value = generateRandomName();
+            }
+            
+            if (randomNameBtn) {
+                randomNameBtn.addEventListener('click', () => {
+                    if (playerNameInput) {
+                        playerNameInput.value = generateRandomName();
+                    }
+                });
+            }
         });
     </script>
 </body>
