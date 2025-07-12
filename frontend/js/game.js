@@ -761,6 +761,9 @@ class EscapeRoomGame {
         
         // Setup chat Enter key support
         this.setupChatControls();
+        
+        // Setup game UI event listeners
+        this.setupGameEventListeners();
     }
 
     switchToLobbyView() {
@@ -994,6 +997,32 @@ class EscapeRoomGame {
         } else {
             console.error('📱 WebSocket not connected, cannot send chat message');
         }
+    }
+
+    // Game interaction methods
+    interact() {
+        // Basic interaction logic - can be expanded later
+        const nearbyObjects = this.findNearbyInteractables();
+        if (nearbyObjects.length > 0) {
+            const obj = nearbyObjects[0];
+            this.sendMessage('interact', {
+                objectId: obj.id,
+                position: this.currentPosition
+            });
+        }
+    }
+
+    toggleInventory() {
+        const inventoryPanel = document.querySelector('.inventory-panel');
+        if (inventoryPanel) {
+            inventoryPanel.classList.toggle('expanded');
+        }
+    }
+
+    findNearbyInteractables() {
+        // Return objects within interaction range
+        // This is a placeholder - implement based on your game objects
+        return [];
     }
 
     // Session persistence methods

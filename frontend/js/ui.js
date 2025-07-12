@@ -229,8 +229,19 @@ class UIManager {
     }
     
     async createRoom(playerName, isPrivate) {
-        // Use selected IP or default to window.location.hostname for LAN
-        const selectedIP = (window.networking && window.networking.selectedIP) || window.location.hostname;
+        // Ensure we have networking initialized and a valid IP selected
+        if (!window.networking || !window.networking.selectedIP) {
+            console.log('No IP selected, refreshing network list...');
+            if (window.networking) {
+                await window.networking.refreshNetworkList();
+            }
+        }
+        
+        const selectedIP = window.networking?.selectedIP;
+        if (!selectedIP) {
+            alert('Please select a network interface first');
+            return;
+        }
         
         console.log(`🔍 DEBUG: createRoom - using IP: ${selectedIP}`);
         
@@ -247,17 +258,29 @@ class UIManager {
         }
     }
     
-    joinRoom(roomCode, playerName) {
-        // Use selected IP or default to current hostname for LAN
-        const selectedIP = (window.networking && window.networking.selectedIP) || window.location.hostname;
+    async joinRoom(roomCode, playerName) {
+        // Ensure we have networking initialized and a valid IP selected
+        if (!window.networking || !window.networking.selectedIP) {
+            console.log('No IP selected, refreshing network list...');
+            if (window.networking) {
+                await window.networking.refreshNetworkList();
+            }
+        }
+        
+        const selectedIP = window.networking?.selectedIP;
+        if (!selectedIP) {
+            alert('Please select a network interface first');
+            return;
+        }
         
         // Connect to game server and join room
         if (!this.game.isConnectedToServer()) {
-            this.game.connect(selectedIP).then(() => {
+            try {
+                await this.game.connect(selectedIP);
                 this.game.joinRoom(roomCode, playerName);
-            }).catch(error => {
+            } catch (error) {
                 alert('Failed to connect to server: ' + error.message);
-            });
+            }
         } else {
             this.game.joinRoom(roomCode, playerName);
         }
@@ -265,7 +288,20 @@ class UIManager {
     
     async findAndJoinPublicRoom(playerName) {
         try {
-            const selectedIP = (window.networking && window.networking.selectedIP) || window.location.hostname;
+            // Ensure we have networking initialized and a valid IP selected
+            if (!window.networking || !window.networking.selectedIP) {
+                console.log('No IP selected, refreshing network list...');
+                if (window.networking) {
+                    await window.networking.refreshNetworkList();
+                }
+            }
+            
+            const selectedIP = window.networking?.selectedIP;
+            if (!selectedIP) {
+                alert('Please select a network interface first');
+                return;
+            }
+            
             const response = await fetch(`http://${selectedIP}:8080/api/rooms`);
             const data = await response.json();
             
@@ -300,8 +336,19 @@ class UIManager {
             return;
         }
 
-        // Use selected IP or default to current hostname for LAN
-        const selectedIP = (window.networking && window.networking.selectedIP) || window.location.hostname;
+        // Ensure we have networking initialized and a valid IP selected
+        if (!window.networking || !window.networking.selectedIP) {
+            console.log('No IP selected, refreshing network list...');
+            if (window.networking) {
+                await window.networking.refreshNetworkList();
+            }
+        }
+        
+        const selectedIP = window.networking?.selectedIP;
+        if (!selectedIP) {
+            alert('Please select a network interface first');
+            return;
+        }
 
         // Connect to server if not already connected
         if (!this.game.isConnectedToServer()) {
@@ -331,8 +378,19 @@ class UIManager {
             return;
         }
 
-        // Use selected IP or default to current hostname for LAN
-        const selectedIP = (window.networking && window.networking.selectedIP) || window.location.hostname;
+        // Ensure we have networking initialized and a valid IP selected
+        if (!window.networking || !window.networking.selectedIP) {
+            console.log('No IP selected, refreshing network list...');
+            if (window.networking) {
+                await window.networking.refreshNetworkList();
+            }
+        }
+        
+        const selectedIP = window.networking?.selectedIP;
+        if (!selectedIP) {
+            alert('Please select a network interface first');
+            return;
+        }
 
         // Connect to server if not already connected, then join room
         if (!this.game.isConnectedToServer()) {
@@ -527,17 +585,28 @@ class UIManager {
         });
     }
 
-    quickJoinRoom(roomCode) {
+    async quickJoinRoom(roomCode) {
         const playerName = prompt('Enter your player name:');
         if (playerName && playerName.trim()) {
-            const targetIP = this.game.getSelectedIP() || window.location.hostname;
+            // Ensure we have a valid IP
+            let targetIP = this.game.getSelectedIP();
+            if (!targetIP && window.networking) {
+                await window.networking.refreshNetworkList();
+                targetIP = window.networking.selectedIP;
+            }
+            
+            if (!targetIP) {
+                alert('Please select a network interface first');
+                return;
+            }
+            
             if (!this.game.isConnectedToServer()) {
-                this.game.connect(targetIP);
-                setTimeout(() => {
-                    if (this.game.isConnectedToServer()) {
-                        this.game.joinRoom(roomCode, playerName.trim());
-                    }
-                }, 1000);
+                try {
+                    await this.game.connect(targetIP);
+                    this.game.joinRoom(roomCode, playerName.trim());
+                } catch (error) {
+                    alert('Failed to connect: ' + error.message);
+                }
             } else {
                 this.game.joinRoom(roomCode, playerName.trim());
             }

@@ -123,6 +123,8 @@ class NetworkManager {
         console.log('Updating IP dropdown with interfaces:', interfaces);
         ipList.innerHTML = '';
         
+        let autoSelectedIP = null;
+        
         interfaces.forEach((iface, index) => {
             const ipItem = document.createElement('div');
             ipItem.className = 'ip-item';
@@ -141,9 +143,23 @@ class NetworkManager {
             });
             
             ipList.appendChild(ipItem);
+            
+            // Auto-select the first LAN IP (192.168.x.x or 10.x.x.x or 172.16-31.x.x)
+            if (!autoSelectedIP && !this.selectedIP) {
+                const ip = iface.ip;
+                if (ip.startsWith('192.168.') || 
+                    ip.startsWith('10.') || 
+                    (ip.startsWith('172.') && parseInt(ip.split('.')[1]) >= 16 && parseInt(ip.split('.')[1]) <= 31)) {
+                    autoSelectedIP = { ip: iface.ip, adapter: iface.adapter };
+                }
+            }
         });
 
-        // Don't auto-select anything - let the user choose
+        // Auto-select the first LAN IP if no IP is currently selected
+        if (autoSelectedIP && !this.selectedIP) {
+            console.log('Auto-selecting LAN IP:', autoSelectedIP.ip);
+            this.selectIP(autoSelectedIP.ip, autoSelectedIP.adapter);
+        }
     }
 
     selectIP(ip, adapter) {
