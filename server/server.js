@@ -83,13 +83,17 @@ class GameRoom {
     }
 
     startGame() {
+        console.log('🎮 GameRoom.startGame() called for room:', this.id);
         if (!this.gameState.started && this.players.size > 0) {
             this.gameState.started = true;
             this.gameState.startTime = Date.now();
+            console.log('🎮 Broadcasting game_started to players');
             this.broadcast({
-                type: 'gameStarted',
+                type: 'game_started',
                 gameState: this.gameState
             });
+        } else {
+            console.log('🎮 Cannot start game - already started or no players');
         }
     }
 }
@@ -129,20 +133,26 @@ wss.on('connection', (ws) => {
 
 function handleMessage(ws, data) {
     switch (data.type) {
-        case 'joinRoom':
+        case 'join_room':
             handleJoinRoom(ws, data);
             break;
-        case 'createRoom':
+        case 'create_room':
             handleCreateRoom(ws, data);
             break;
-        case 'playerMove':
+        case 'player_move':
             handlePlayerMove(ws, data);
             break;
-        case 'startGame':
+        case 'start_game':
             handleStartGame(ws, data);
             break;
-        case 'interactWithObject':
+        case 'interact_with_object':
             handleInteraction(ws, data);
+            break;
+        case 'chat_message':
+            handleChatMessage(ws, data);
+            break;
+        case 'ping':
+            handlePing(ws, data);
             break;
         default:
             console.log('Unknown message type:', data.type);
@@ -236,15 +246,35 @@ function handlePlayerMove(ws, data) {
 }
 
 function handleStartGame(ws, data) {
+    console.log('🎮 handleStartGame called with data:', data);
     const playerId = getPlayerIdByWs(ws);
+    console.log('🎮 Found player ID:', playerId);
+    
     if (playerId) {
         const player = players.get(playerId);
+        console.log('🎮 Found player:', player);
+        
         if (player && player.roomId) {
             const room = gameRooms.get(player.roomId);
+            console.log('🎮 Found room:', room ? room.id : 'null');
+            
             if (room) {
+                console.log('🎮 Starting game for room:', room.id);
                 room.startGame();
+                
+                // Broadcast game started to all players in room
+                room.broadcast({
+                    type: 'game_started',
+                    gameState: room.gameState
+                });
+            } else {
+                console.error('🎮 Room not found for player:', playerId);
             }
+        } else {
+            console.error('🎮 Player not found or not in room:', playerId);
         }
+    } else {
+        console.error('🎮 Could not find player ID for WebSocket');
     }
 }
 
@@ -267,6 +297,44 @@ function handleInteraction(ws, data) {
     }
 }
 
+function handleChatMessage(ws, data) {
+    const playerId = getPlayerIdByWs(ws);
+    if (!playerId) {
+        console.log('🚫 Chat message from unknown player');
+        return;
+    }
+
+    const player = players.get(playerId);
+    if (!player || !player.roomId) {
+        console.log('🚫 Chat message from player not in room');
+        return;
+    }
+
+    const room = gameRooms.get(player.roomId);
+    if (!room) {
+        console.log('🚫 Chat message for non-existent room');
+        return;
+    }
+
+    console.log(`💬 Chat message from ${player.name}: ${data.message}`);
+
+    // Broadcast chat message to all players in the room
+    room.broadcast({
+        type: 'chat_message',
+        playerName: player.name,
+        message: data.message,
+        timestamp: Date.now()
+    });
+}
+
+function handlePing(ws, data) {
+    // Respond to ping with pong
+    ws.send(JSON.stringify({
+        type: 'pong',
+        timestamp: Date.now()
+    }));
+}
+
 function getPlayerIdByWs(ws) {
     for (const [playerId, player] of players) {
         if (player.ws === ws) {
@@ -277,8 +345,8 @@ function getPlayerIdByWs(ws) {
 }
 
 // Start server
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`🚀 Multiplayer Escape Room Server running on port ${PORT}`);
-    console.log(`📱 Game client available at: http://localhost:${PORT}`);
+const PORT = process.env.PORT || 8080;
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Multiplayer Escape Room Server running on 0.0.0.0:${PORT}`);
+    console.log(`📱 Game client available at: http://0.0.0.0:${PORT}`);
 });

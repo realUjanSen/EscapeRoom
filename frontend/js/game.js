@@ -40,23 +40,61 @@ class EscapeRoomGame {
     }
 
     setupMobileControls() {
-        // Create virtual joystick for mobile
-        const joystickContainer = document.createElement('div');
-        joystickContainer.className = 'mobile-joystick';
-        joystickContainer.innerHTML = `
-            <div class="joystick-base">
-                <div class="joystick-knob"></div>
-            </div>
-            <div class="mobile-buttons">
-                <button class="mobile-btn interact-btn">E</button>
-                <button class="mobile-btn menu-btn">Menu</button>
-            </div>
-        `;
+        // Handle the existing mobile controls in the HTML
+        const mobileControls = document.getElementById('mobileControls');
+        if (!mobileControls) return;
         
-        if (this.isMobile()) {
-            document.body.appendChild(joystickContainer);
-            this.setupJoystickControls(joystickContainer);
-        }
+        console.log('🎮 Setting up mobile controls');
+        
+        // D-pad buttons for movement
+        const dpadButtons = mobileControls.querySelectorAll('.d-btn');
+        dpadButtons.forEach(button => {
+            const key = button.getAttribute('data-key');
+            if (key) {
+                // Prevent default touch behavior
+                button.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    console.log(`🎮 Mobile: ${key} pressed`);
+                    this.keys[key] = true;
+                }, { passive: false });
+                
+                button.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    console.log(`🎮 Mobile: ${key} released`);
+                    this.keys[key] = false;
+                }, { passive: false });
+                
+                // Also handle mouse events for desktop testing
+                button.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    this.keys[key] = true;
+                });
+                
+                button.addEventListener('mouseup', (e) => {
+                    e.preventDefault();
+                    this.keys[key] = false;
+                });
+            }
+        });
+        
+        // Action buttons for interactions
+        const actionButtons = mobileControls.querySelectorAll('.action-btn');
+        actionButtons.forEach(button => {
+            const key = button.getAttribute('data-key');
+            if (key) {
+                button.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    console.log(`🎮 Mobile action: ${key}`);
+                    this.handleMobileAction(key);
+                }, { passive: false });
+                
+                // Also handle click for desktop testing
+                button.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.handleMobileAction(key);
+                });
+            }
+        });
     }
 
     setupJoystickControls(container) {
@@ -612,6 +650,14 @@ class EscapeRoomGame {
         this.playerId = data.playerId;
         this.isHost = data.isHost;
         
+        // Add the host (current player) to the players map
+        this.players.set(this.playerId, {
+            playerId: this.playerId,
+            name: data.playerName || 'Host',
+            position: { x: 100, y: 100 },
+            isHost: this.isHost
+        });
+        
         console.log(`🔍 DEBUG: Room created - roomCode: ${this.roomCode}, playerId: ${this.playerId}, isHost: ${this.isHost}`);
         
         // Save session data
@@ -830,20 +876,8 @@ class EscapeRoomGame {
         // Clear existing list
         playersList.innerHTML = '';
         
-        // Start with connected players
-        const allPlayers = new Map(this.players);
-        
-        // Add current player if not already in the map
-        if (!allPlayers.has(this.playerId) && this.playerId) {
-            allPlayers.set(this.playerId, {
-                playerId: this.playerId,
-                name: 'You',
-                isHost: this.isHost
-            });
-        }
-        
-        // Convert to array and sort (host first)
-        const playersArray = Array.from(allPlayers.values()).sort((a, b) => {
+        // Use the players map directly - it should contain all players including the current one
+        const playersArray = Array.from(this.players.values()).sort((a, b) => {
             if (a.isHost && !b.isHost) return -1;
             if (!a.isHost && b.isHost) return 1;
             return 0;
@@ -854,7 +888,7 @@ class EscapeRoomGame {
             playerElement.className = 'player-item';
             
             const isCurrentPlayer = player.playerId === this.playerId;
-            const playerName = isCurrentPlayer ? 'You' : player.name;
+            const playerName = isCurrentPlayer ? `${player.name} (You)` : player.name;
             const hostBadge = player.isHost ? ' 👑' : '';
             
             playerElement.innerHTML = `
@@ -870,7 +904,7 @@ class EscapeRoomGame {
         });
         
         // Update player count
-        playerCount.textContent = allPlayers.size;
+        playerCount.textContent = this.players.size;
     }
 
     updateStartGameButton() {
@@ -885,8 +919,8 @@ class EscapeRoomGame {
         
         startGameBtn.style.display = 'block';
         
-        // Need at least 1 player to start (just the host is fine for testing)
-        const playerCount = this.players.size + 1; // +1 for current player
+        // Use the actual player count from the players Map
+        const playerCount = this.players.size;
         startGameBtn.disabled = playerCount < 1;
         
         if (playerCount >= 1) {
@@ -1222,6 +1256,37 @@ class EscapeRoomGame {
     showError(message) {
         this.showNotification(message, 'error');
         console.error('Game Error:', message);
+    }
+
+    handleMobileAction(key) {
+        // Handle action buttons (interact, inventory)
+        if (key === 'e') {
+            this.interact();
+        } else if (key === 'i') {
+            this.toggleInventory();
+        }
+    }
+
+    setupChatControls() {
+        const chatInput = document.getElementById('chatInput');
+        const sendChatBtn = document.getElementById('sendChatBtn');
+        
+        if (chatInput) {
+            // Handle Enter key to send messages
+            chatInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    this.sendChatMessage();
+                }
+            });
+        }
+        
+        if (sendChatBtn) {
+            // Handle send button click
+            sendChatBtn.addEventListener('click', () => {
+                this.sendChatMessage();
+            });
+        }
     }
 }
 
