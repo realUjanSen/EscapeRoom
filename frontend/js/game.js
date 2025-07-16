@@ -609,7 +609,7 @@ class EscapeRoomGame {
         const existingPlayers = gameWorld.querySelectorAll('.player');
         existingPlayers.forEach(player => player.remove());
 
-        // Render current player as a simple dot
+        // Render current player as a red dot
         const currentPlayerElement = document.createElement('div');
         currentPlayerElement.className = 'player current-player';
         currentPlayerElement.id = 'currentPlayer';
@@ -621,7 +621,7 @@ class EscapeRoomGame {
         currentPlayerElement.style.transform = `translate(${this.currentPosition.x - 10}px, ${this.currentPosition.y - 10}px)`;
         currentPlayerElement.style.width = '20px';
         currentPlayerElement.style.height = '20px';
-        currentPlayerElement.style.backgroundColor = '#e74c3c';
+        currentPlayerElement.style.backgroundColor = '#e74c3c'; // Red for current player
         currentPlayerElement.style.border = '2px solid #fff';
         currentPlayerElement.style.borderRadius = '50%';
         currentPlayerElement.style.boxSizing = 'border-box';
@@ -630,7 +630,54 @@ class EscapeRoomGame {
         
         gameWorld.appendChild(currentPlayerElement);
         
-        console.log(`🎮 Player dot rendered at ${this.currentPosition.x}, ${this.currentPosition.y}`);
+        console.log(`🎮 Current player dot rendered at ${this.currentPosition.x}, ${this.currentPosition.y}`);
+        
+        // Render OTHER players as blue dots
+        this.players.forEach((player, playerId) => {
+            // Skip the current player (already rendered above)
+            if (playerId === this.playerId) return;
+            
+            const otherPlayerElement = document.createElement('div');
+            otherPlayerElement.className = 'player other-player';
+            otherPlayerElement.id = `player-${playerId}`;
+            
+            // Style as blue dot
+            otherPlayerElement.style.position = 'absolute';
+            otherPlayerElement.style.left = '0px';
+            otherPlayerElement.style.top = '0px';
+            otherPlayerElement.style.transform = `translate(${player.position.x - 10}px, ${player.position.y - 10}px)`;
+            otherPlayerElement.style.width = '20px';
+            otherPlayerElement.style.height = '20px';
+            otherPlayerElement.style.backgroundColor = '#3498db'; // Blue for other players
+            otherPlayerElement.style.border = '2px solid #fff';
+            otherPlayerElement.style.borderRadius = '50%';
+            otherPlayerElement.style.boxSizing = 'border-box';
+            otherPlayerElement.style.zIndex = '99';
+            otherPlayerElement.style.transition = 'transform 0.1s linear'; // Smooth movement
+            
+            // Add player name above the dot
+            const nameElement = document.createElement('div');
+            nameElement.className = 'player-name';
+            nameElement.textContent = player.name;
+            nameElement.style.position = 'absolute';
+            nameElement.style.top = '-25px';
+            nameElement.style.left = '50%';
+            nameElement.style.transform = 'translateX(-50%)';
+            nameElement.style.color = '#fff';
+            nameElement.style.fontSize = '12px';
+            nameElement.style.fontWeight = 'bold';
+            nameElement.style.textAlign = 'center';
+            nameElement.style.background = 'rgba(0,0,0,0.8)';
+            nameElement.style.padding = '2px 6px';
+            nameElement.style.borderRadius = '3px';
+            nameElement.style.whiteSpace = 'nowrap';
+            nameElement.style.pointerEvents = 'none';
+            
+            otherPlayerElement.appendChild(nameElement);
+            gameWorld.appendChild(otherPlayerElement);
+            
+            console.log(`🎮 Other player ${player.name} rendered at ${player.position.x}, ${player.position.y}`);
+        });
     }
 
     renderUI() {
@@ -732,6 +779,11 @@ class EscapeRoomGame {
         const player = this.players.get(data.playerId);
         if (player) {
             player.position = data.position;
+            
+            // Re-render all players to update the moved player's position
+            this.renderPlayers();
+            
+            console.log(`🎮 Player ${player.name} moved to ${data.position.x}, ${data.position.y}`);
         }
     }
 
@@ -816,6 +868,9 @@ class EscapeRoomGame {
         
         // Initialize game objects and start rendering
         this.initializeGameObjects();
+        
+        // Render all players (current + others)
+        this.renderPlayers();
         
         // Setup chat Enter key support
         this.setupChatControls();
@@ -1013,6 +1068,7 @@ class EscapeRoomGame {
     }
     
     sendChatMessage() {
+        console.log('📱 DEBUG: sendChatMessage called');
         const chatInput = document.getElementById('chatInput');
         if (!chatInput) {
             console.error('📱 Chat input not found');
@@ -1020,6 +1076,7 @@ class EscapeRoomGame {
         }
         
         const message = chatInput.value.trim();
+        console.log('📱 DEBUG: Message value:', message);
         if (!message) {
             console.log('📱 Empty message, not sending');
             return;
@@ -1028,11 +1085,15 @@ class EscapeRoomGame {
         console.log('📱 Sending chat message:', message);
         
         if (this.wsClient && this.wsClient.isConnected()) {
-            const success = this.wsClient.sendMessage('chat_message', { 
+            console.log('📱 DEBUG: WebSocket connected, sending message');
+            const messageData = { 
                 message: message,
                 playerName: this.players.get(this.playerId)?.name || 'Unknown',
                 timestamp: Date.now()
-            });
+            };
+            console.log('📱 DEBUG: Message data:', messageData);
+            
+            const success = this.wsClient.sendMessage('chat_message', messageData);
             
             if (success) {
                 chatInput.value = '';
@@ -1287,10 +1348,40 @@ class EscapeRoomGame {
         
         if (sendChatBtn) {
             // Handle send button click
-            sendChatBtn.addEventListener('click', () => {
+            sendChatBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('📱 DEBUG: Send chat button clicked');
                 this.sendChatMessage();
             });
         }
+    }
+
+    addChatMessage(playerName, message, timestamp) {
+        const chatMessages = document.getElementById('chatMessages');
+        if (!chatMessages) {
+            console.error('📱 Chat messages container not found');
+            return;
+        }
+
+        const messageElement = document.createElement('div');
+        messageElement.className = 'chat-message';
+        
+        const time = new Date(timestamp).toLocaleTimeString();
+        const isOwnMessage = playerName === (this.players.get(this.playerId)?.name || 'Unknown');
+        
+        messageElement.innerHTML = `
+            <div class="chat-message-header">
+                <span class="chat-player-name ${isOwnMessage ? 'own-message' : ''}">${playerName}</span>
+                <span class="chat-timestamp">${time}</span>
+            </div>
+            <div class="chat-message-content">${message}</div>
+        `;
+        
+        chatMessages.appendChild(messageElement);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        
+        console.log('📱 Added chat message to UI:', { playerName, message, timestamp });
     }
 }
 

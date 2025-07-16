@@ -11,41 +11,58 @@ class WebSocketManager {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}`;
         
+        console.log('🔗 WebSocket Connection Attempt:');
+        console.log(`📍 Protocol: ${protocol}`);
+        console.log(`🌐 Host: ${window.location.host}`);
+        console.log(`🔗 Full URL: ${wsUrl}`);
+        console.log(`🚦 Current network status: ${navigator.onLine ? 'Online' : 'Offline'}`);
+        
         try {
+            console.log('⚡ Creating WebSocket connection...');
             this.ws = new WebSocket(wsUrl);
             this.setupEventListeners();
         } catch (error) {
-            console.error('Failed to create WebSocket connection:', error);
+            console.error('❌ Failed to create WebSocket connection:', error);
+            console.error('🔥 This could be a firewall issue - check Windows Defender settings');
             this.scheduleReconnect();
         }
     }
 
     setupEventListeners() {
         this.ws.onopen = () => {
-            console.log('Connected to server');
+            console.log('✅ Connected to server successfully!');
+            console.log(`🎯 WebSocket state: ${this.ws.readyState} (OPEN)`);
             this.isConnected = true;
             this.reconnectAttempts = 0;
             this.onConnectionChange(true);
         };
 
         this.ws.onmessage = (event) => {
+            console.log('📨 Received message:', event.data);
             try {
                 const data = JSON.parse(event.data);
                 this.handleMessage(data);
             } catch (error) {
-                console.error('Error parsing message:', error);
+                console.error('❌ Error parsing message:', error);
             }
         };
 
-        this.ws.onclose = () => {
-            console.log('Disconnected from server');
+        this.ws.onclose = (event) => {
+            console.log('🔌 Disconnected from server');
+            console.log(`🔍 Close code: ${event.code}, reason: ${event.reason}`);
+            console.log(`🎯 WebSocket state: ${this.ws.readyState} (CLOSED)`);
             this.isConnected = false;
             this.onConnectionChange(false);
             this.scheduleReconnect();
         };
 
         this.ws.onerror = (error) => {
-            console.error('WebSocket error:', error);
+            console.error('🚨 WebSocket error:', error);
+            console.error('🔥 Possible causes:');
+            console.error('   - Windows Firewall blocking connection');
+            console.error('   - Server not running');
+            console.error('   - Network connectivity issues');
+            console.error('   - Port forwarding issues');
         };
     }
 

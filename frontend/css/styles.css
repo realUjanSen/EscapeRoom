@@ -905,6 +905,32 @@ body {
     font-size: 0.9rem;
 }
 
+.chat-message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.25rem;
+}
+
+.chat-player-name {
+    font-weight: bold;
+    color: #4ecdc4;
+}
+
+.chat-player-name.own-message {
+    color: #ffd700;
+}
+
+.chat-timestamp {
+    color: #888;
+    font-size: 0.8rem;
+}
+
+.chat-message-content {
+    color: #fff;
+    line-height: 1.3;
+}
+
 .chat-message .player-name {
     font-weight: bold;
     color: #4ecdc4;

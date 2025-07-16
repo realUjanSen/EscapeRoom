@@ -17,6 +17,27 @@ class App {
 
     start() {
         console.log('🚀 Starting application...');
+        console.log(`🌐 Client Info:`, {
+            userAgent: navigator.userAgent,
+            platform: navigator.platform,
+            language: navigator.language,
+            cookieEnabled: navigator.cookieEnabled,
+            onLine: navigator.onLine,
+            url: window.location.href,
+            origin: window.location.origin,
+            host: window.location.host
+        });
+        
+        // Check network connectivity
+        if (!navigator.onLine) {
+            console.warn('⚠️ Client appears to be offline!');
+        }
+        
+        // Log firewall/connection debugging info
+        console.log('🔗 Connection debugging info:');
+        console.log(`📍 Current page: ${window.location.href}`);
+        console.log(`🖥️ User agent: ${navigator.userAgent}`);
+        console.log(`🌍 Network status: ${navigator.onLine ? 'Online' : 'Offline'}`);
         
         // Initialize WebSocket connection
         this.initWebSocket();
