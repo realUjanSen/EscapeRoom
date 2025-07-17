@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple WebSocket Test</title>
+</head>
+<body>
+    <h1>Simple WebSocket Test</h1>
+    <div id="status">Connecting...</div>
+    <div id="messages"></div>
+    <button onclick="testConnection()">Test Connection</button>
+    <button onclick="createRoom()">Create Room</button>
+    <button onclick="sendChat()">Send Chat</button>
+    
+    <script>
+        let ws = null;
+        let connected = false;
+        
+        function updateStatus(message) {
+            document.getElementById('status').textContent = message;
+        }
+        
+        function addMessage(message) {
+            const div = document.createElement('div');
+            div.textContent = new Date().toLocaleTimeString() + ': ' + message;
+            document.getElementById('messages').appendChild(div);
+        }
+        
+        function testConnection() {
+            if (ws) {
+                ws.close();
+            }
+            
+            addMessage('Connecting to WebSocket...');
+            ws = new WebSocket('ws://localhost:8080');
+            
+            ws.onopen = function() {
+                addMessage('✅ Connected to WebSocket');
+                updateStatus('Connected');
+                connected = true;
+                
+                // Send a ping message immediately
+                setTimeout(() => {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        addMessage('📤 Sending ping...');
+                        ws.send(JSON.stringify({
+                            type: 'ping',
+                            data: {},
+                            timestamp: Date.now()
+                        }));
+                    }
+                }, 500);
+                
+                // Create a room after a delay
+                setTimeout(() => {
+                    createRoom();
+                }, 1000);
+                
+                // Send a chat message after room creation
+                setTimeout(() => {
+                    sendChat();
+                }, 2000);
+            };
+            
+            ws.onmessage = function(event) {
+                addMessage('📨 Received: ' + event.data);
+            };
+            
+            ws.onclose = function() {
+                addMessage('❌ WebSocket closed');
+                updateStatus('Disconnected');
+                connected = false;
+            };
+            
+            ws.onerror = function(error) {
+                addMessage('❌ WebSocket error: ' + error);
+                updateStatus('Error');
+            };
+        }
+        
+        function createRoom() {
+            if (!connected) {
+                addMessage('❌ Not connected');
+                return;
+            }
+            
+            const message = {
+                type: 'create_room',
+                data: {
+                    playerName: 'TestPlayer',
+                    isPrivate: false
+                }
+            };
+            
+            addMessage('📤 Sending create_room message...');
+            ws.send(JSON.stringify(message));
+        }
+        
+        function sendChat() {
+            if (!connected) {
+                addMessage('❌ Not connected');
+                return;
+            }
+            
+            const message = {
+                type: 'chat_message',
+                data: {
+                    message: 'Hello from simple test!',
+                    playerName: 'TestPlayer',
+                    timestamp: Date.now()
+                }
+            };
+            
+            addMessage('📤 Sending chat message...');
+            ws.send(JSON.stringify(message));
+        }
+        
+        // Auto-connect on page load
+        testConnection();
+    </script>
+</body>
+</html>

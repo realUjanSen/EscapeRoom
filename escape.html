@@ -55,10 +55,19 @@
             </div>
             
             <div class="menu-actions">
-                <button id="createRoomBtn" class="btn btn-primary">
-                    <span class="btn-icon">➕</span>
-                    Create Room
-                </button>
+                <div class="create-room-section">
+                    <button id="createRoomBtn" class="btn btn-primary">
+                        <span class="btn-icon">➕</span>
+                        Create Room
+                    </button>
+                    <div class="room-options">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="privateRoomCheckbox">
+                            <span class="checkmark"></span>
+                            Private Room
+                        </label>
+                    </div>
+                </div>
                 
                 <div class="join-section">
                     <input type="text" id="roomCode" placeholder="Room Code (6 digits)" maxlength="6" pattern="[A-Z0-9]{6}">
@@ -345,6 +354,9 @@
             // Add random name button functionality
             const randomNameBtn = document.getElementById('randomNameBtn');
             const playerNameInput = document.getElementById('playerName');
+            const fullscreenBtn = document.getElementById('fullscreenBtn');
+            const settingsBtn = document.getElementById('settingsBtn');
+            const leaveGameBtn = document.getElementById('leaveGameBtn');
             
             // Auto-generate name on page load
             if (playerNameInput && !playerNameInput.value) {
@@ -356,6 +368,41 @@
                     if (playerNameInput) {
                         playerNameInput.value = generateRandomName();
                     }
+                });
+            }
+            
+            // Leave Room button functionality
+            if (leaveGameBtn) {
+                leaveGameBtn.addEventListener('click', () => {
+                    console.log('Leave room button clicked');
+                    if (game && confirm('Are you sure you want to leave the room?')) {
+                        game.leaveRoom();
+                    }
+                });
+            }
+            
+            // Fullscreen button functionality
+            if (fullscreenBtn) {
+                fullscreenBtn.addEventListener('click', () => {
+                    if (!document.fullscreenElement) {
+                        document.documentElement.requestFullscreen().catch(err => {
+                            console.error('Error attempting to enable fullscreen:', err);
+                        });
+                    } else {
+                        document.exitFullscreen().catch(err => {
+                            console.error('Error attempting to exit fullscreen:', err);
+                        });
+                    }
+                });
+            }
+            
+            // Settings button functionality - show settings modal instead of exiting lobby
+            if (settingsBtn) {
+                settingsBtn.addEventListener('click', () => {
+                    // Toggle settings modal or show settings panel
+                    console.log('Settings button clicked');
+                    // For now, prevent default behavior that might be exiting lobby
+                    // In the future, this could open a settings modal
                 });
             }
         });

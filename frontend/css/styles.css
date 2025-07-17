@@ -344,6 +344,61 @@ body {
     margin-bottom: 3rem;
 }
 
+.create-room-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.room-options {
+    display: flex;
+    justify-content: center;
+    margin-top: 0.5rem;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    color: #ffffff;
+    font-size: 0.9rem;
+    user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #4ecdc4;
+    border-radius: 3px;
+    background: transparent;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.checkbox-label input[type="checkbox"]:checked {
+    background: #4ecdc4;
+    border-color: #4ecdc4;
+}
+
+.checkbox-label input[type="checkbox"]:checked::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #000;
+    font-weight: bold;
+    font-size: 12px;
+}
+
+.checkbox-label:hover input[type="checkbox"] {
+    border-color: #44a08d;
+}
+
 .join-section {
     display: flex;
     gap: 0.5rem;
@@ -447,13 +502,10 @@ body {
 }
 
 .room-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
-    margin: 0.5rem 0;
     background: rgba(255, 255, 255, 0.1);
     border-radius: 6px;
+    padding: 1rem;
+    margin: 0.5rem 0;
     transition: all 0.3s ease;
 }
 
@@ -461,9 +513,33 @@ body {
     background: rgba(255, 255, 255, 0.15);
 }
 
+.room-item.game-started {
+    background: rgba(255, 165, 0, 0.1);
+    border-left: 4px solid #ff6b35;
+}
+
+.room-item.waiting {
+    background: rgba(0, 255, 0, 0.1);
+    border-left: 4px solid #4ecdc4;
+}
+
+.room-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
 .room-info {
-    flex: 1;
-    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.room-details {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
 }
 
 .room-code {
@@ -471,6 +547,33 @@ body {
     color: #4ecdc4;
     font-family: 'Courier New', monospace;
     font-size: 1.2rem;
+}
+
+.room-status {
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: bold;
+}
+
+.room-status.playing {
+    background: rgba(255, 107, 53, 0.2);
+    color: #ff6b35;
+}
+
+.room-status.waiting {
+    background: rgba(78, 205, 196, 0.2);
+    color: #4ecdc4;
+}
+
+.player-count {
+    color: #ccc;
+    font-size: 0.9rem;
+}
+
+.host-name {
+    color: #aaa;
+    font-size: 0.9rem;
 }
 
 .room-players {
@@ -489,9 +592,30 @@ body {
     transition: all 0.3s ease;
 }
 
-.join-room-btn:hover {
+.join-room-btn:hover:not(:disabled) {
     background: #44a08d;
     transform: scale(1.05);
+}
+
+.join-room-btn:disabled {
+    background: #666;
+    color: #999;
+    cursor: not-allowed;
+}
+
+.no-rooms {
+    text-align: center;
+    color: #aaa;
+    font-style: italic;
+    padding: 2rem;
+}
+
+.error-message {
+    text-align: center;
+    color: #ff6b35;
+    padding: 1rem;
+    background: rgba(255, 107, 53, 0.1);
+    border-radius: 6px;
 }
 
 /* Loading States */

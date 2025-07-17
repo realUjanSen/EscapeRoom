@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .debug { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .error { background: #ffebee; color: #c62828; }
+        .success { background: #e8f5e8; color: #2e7d32; }
+        .info { background: #e3f2fd; color: #1565c0; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        input { padding: 8px; margin: 5px; width: 300px; }
+        #chatMessages { height: 200px; border: 1px solid #ddd; overflow-y: auto; padding: 10px; margin: 10px 0; }
+        .test-section { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Escape Room Debug Test</h1>
+        
+        <div class="test-section">
+            <h2>📡 WebSocket Connection Test</h2>
+            <button onclick="testWebSocketConnection()">Test WebSocket Connection</button>
+            <div id="wsStatus" class="debug"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>🏠 Public Rooms API Test</h2>
+            <button onclick="testPublicRoomsAPI()">Test Public Rooms API</button>
+            <div id="roomsStatus" class="debug"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>🎮 Game Flow Test</h2>
+            <button onclick="createTestRoom()">Create Test Room</button>
+            <button onclick="joinTestRoom()">Join Test Room</button>
+            <button onclick="startTestGame()">Start Game</button>
+            <div id="gameStatus" class="debug"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>💬 Chat System Test</h2>
+            <div id="chatMessages"></div>
+            <input type="text" id="testChatInput" placeholder="Type test message...">
+            <button onclick="sendTestMessage()">Send Test Message</button>
+            <div id="chatStatus" class="debug"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>🔍 Debug Logs</h2>
+            <button onclick="clearLogs()">Clear Logs</button>
+            <div id="debugLogs" class="debug" style="height: 300px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let roomCode = null;
+        let playerId = null;
+        let playerName = 'TestPlayer';
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toISOString();
+            const logEntry = `[${timestamp}] ${message}`;
+            console.log(logEntry);
+            
+            const debugLogs = document.getElementById('debugLogs');
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = logEntry;
+            debugLogs.appendChild(div);
+            debugLogs.scrollTop = debugLogs.scrollHeight;
+        }
+        
+        function clearLogs() {
+            document.getElementById('debugLogs').innerHTML = '';
+        }
+        
+        function testWebSocketConnection() {
+            log('Testing WebSocket connection to ws://localhost:8080...', 'info');
+            
+            if (ws) {
+                ws.close();
+            }
+            
+            ws = new WebSocket('ws://localhost:8080');
+            
+            ws.onopen = function() {
+                log('✅ WebSocket connected successfully', 'success');
+                document.getElementById('wsStatus').innerHTML = '<span class="success">Connected</span>';
+            };
+            
+            ws.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    log(`📨 Received: ${data.type} - ${JSON.stringify(data.data)}`, 'info');
+                    
+                    if (data.type === 'room_created') {
+                        roomCode = data.data.roomCode;
+                        playerId = data.data.playerId;
+                        log(`🏠 Room created: ${roomCode}, Player ID: ${playerId}`, 'success');
+                    } else if (data.type === 'chat_message') {
+                        const chatMessages = document.getElementById('chatMessages');
+                        const messageDiv = document.createElement('div');
+                        messageDiv.innerHTML = `<strong>${data.data.playerName}:</strong> ${data.data.message}`;
+                        chatMessages.appendChild(messageDiv);
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }
+                } catch (error) {
+                    log(`❌ Error parsing message: ${error.message}`, 'error');
+                }
+            };
+            
+            ws.onerror = function(error) {
+                log(`❌ WebSocket error: ${error}`, 'error');
+                document.getElementById('wsStatus').innerHTML = '<span class="error">Error</span>';
+            };
+            
+            ws.onclose = function() {
+                log('🔌 WebSocket connection closed', 'info');
+                document.getElementById('wsStatus').innerHTML = '<span class="info">Disconnected</span>';
+            };
+        }
+        
+        async function testPublicRoomsAPI() {
+            log('Testing Public Rooms API...', 'info');
+            
+            try {
+                const response = await fetch('http://localhost:8080/api/rooms');
+                const data = await response.json();
+                
+                if (data.success) {
+                    log(`✅ Public Rooms API working: ${data.rooms.length} rooms found`, 'success');
+                    document.getElementById('roomsStatus').innerHTML = `
+                        <div class="success">
+                            <strong>API Working:</strong> ${data.rooms.length} rooms found<br>
+                            <pre>${JSON.stringify(data.rooms, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    log(`❌ Public Rooms API failed: ${data.message}`, 'error');
+                    document.getElementById('roomsStatus').innerHTML = `<span class="error">API Error: ${data.message}</span>`;
+                }
+            } catch (error) {
+                log(`❌ Public Rooms API error: ${error.message}`, 'error');
+                document.getElementById('roomsStatus').innerHTML = `<span class="error">Network Error: ${error.message}</span>`;
+            }
+        }
+        
+        function createTestRoom() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('❌ WebSocket not connected. Connect first.', 'error');
+                return;
+            }
+            
+            log('Creating test room...', 'info');
+            
+            const message = {
+                type: 'create_room',
+                data: {
+                    playerName: playerName,
+                    isPrivate: false
+                },
+                timestamp: Date.now()
+            };
+            
+            ws.send(JSON.stringify(message));
+            log(`📤 Sent create_room message: ${JSON.stringify(message)}`, 'info');
+        }
+        
+        function joinTestRoom() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('❌ WebSocket not connected. Connect first.', 'error');
+                return;
+            }
+            
+            if (!roomCode) {
+                log('❌ No room code available. Create a room first.', 'error');
+                return;
+            }
+            
+            log(`Joining test room: ${roomCode}...`, 'info');
+            
+            const message = {
+                type: 'join_room',
+                data: {
+                    roomCode: roomCode,
+                    playerName: playerName + '2'
+                },
+                timestamp: Date.now()
+            };
+            
+            ws.send(JSON.stringify(message));
+            log(`📤 Sent join_room message: ${JSON.stringify(message)}`, 'info');
+        }
+        
+        function startTestGame() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('❌ WebSocket not connected. Connect first.', 'error');
+                return;
+            }
+            
+            log('Starting test game...', 'info');
+            
+            const message = {
+                type: 'game_start',
+                data: {
+                    timeLimit: '3600',
+                    difficulty: 'medium'
+                },
+                timestamp: Date.now()
+            };
+            
+            ws.send(JSON.stringify(message));
+            log(`📤 Sent game_start message: ${JSON.stringify(message)}`, 'info');
+        }
+        
+        function sendTestMessage() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('❌ WebSocket not connected. Connect first.', 'error');
+                return;
+            }
+            
+            const input = document.getElementById('testChatInput');
+            const message = input.value.trim();
+            
+            if (!message) {
+                log('❌ No message to send', 'error');
+                return;
+            }
+            
+            log(`Sending chat message: "${message}"`, 'info');
+            
+            const chatMessage = {
+                type: 'chat_message',
+                data: {
+                    message: message,
+                    playerName: playerName,
+                    timestamp: Date.now()
+                },
+                timestamp: Date.now()
+            };
+            
+            ws.send(JSON.stringify(chatMessage));
+            log(`📤 Sent chat_message: ${JSON.stringify(chatMessage)}`, 'info');
+            
+            input.value = '';
+        }
+        
+        // Auto-connect on page load
+        window.onload = function() {
+            testWebSocketConnection();
+            testPublicRoomsAPI();
+        };
+    </script>
+</body>
+</html>

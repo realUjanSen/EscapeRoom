@@ -117,9 +117,6 @@ const wss = new WebSocket.Server({ server });
 
 wss.on('connection', (ws, req) => {
     console.log('New WebSocket connection from:', req.connection.remoteAddress);
-    
-    let playerId = null;
-    let currentRoom = null;
 
     ws.on('message', (data) => {
         try {
@@ -135,8 +132,9 @@ wss.on('connection', (ws, req) => {
     });
 
     ws.on('close', () => {
-        if (playerId && currentRoom) {
-            handlePlayerDisconnect(playerId, currentRoom);
+        const player = players.get(ws);
+        if (player) {
+            handlePlayerDisconnect(player.playerId, player.roomCode);
         }
         players.delete(ws);
         console.log('WebSocket connection closed');
@@ -217,7 +215,7 @@ wss.on('connection', (ws, req) => {
         } while (rooms.has(roomCode));
 
         // Set connection-scope variables
-        playerId = `player_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        const playerId = `player_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         
         const room = new GameRoom(roomCode, playerId, isPrivate);
         const playerData = {
@@ -230,9 +228,6 @@ wss.on('connection', (ws, req) => {
             rooms.set(roomCode, room);
             players.set(ws, { playerId, roomCode });
             
-            // Set current room for this connection
-            currentRoom = roomCode;
-
             ws.send(JSON.stringify({
                 type: 'room_created',
                 data: {
@@ -284,7 +279,7 @@ wss.on('connection', (ws, req) => {
             }));
         }
 
-        playerId = `player_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        const playerId = `player_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         
         const playerData = {
             playerId,
@@ -294,7 +289,6 @@ wss.on('connection', (ws, req) => {
 
         if (room.addPlayer(playerId, playerData)) {
             players.set(ws, { playerId, roomCode: room.roomCode });
-            currentRoom = room.roomCode;
 
             // Send join confirmation to player
             ws.send(JSON.stringify({
@@ -333,15 +327,18 @@ wss.on('connection', (ws, req) => {
     }
 
     function handleLeaveRoom(ws, data) {
-        if (playerId && currentRoom) {
-            handlePlayerDisconnect(playerId, currentRoom);
+        const player = players.get(ws);
+        if (player) {
+            handlePlayerDisconnect(player.playerId, player.roomCode);
         }
     }
 
     function handlePlayerMove(ws, data) {
-        if (!currentRoom || !playerId) return;
+        const player = players.get(ws);
+        if (!player) return;
 
-        const room = rooms.get(currentRoom);
+        const { playerId, roomCode } = player;
+        const room = rooms.get(roomCode);
         if (!room || !room.players.has(playerId)) return;
 
         const { position } = data;
@@ -361,9 +358,11 @@ wss.on('connection', (ws, req) => {
     }
 
     function handlePlayerInteract(ws, data) {
-        if (!currentRoom || !playerId) return;
+        const player = players.get(ws);
+        if (!player) return;
 
-        const room = rooms.get(currentRoom);
+        const { playerId, roomCode } = player;
+        const room = rooms.get(roomCode);
         if (!room || !room.players.has(playerId)) return;
 
         const { objectId, interactionType } = data;
@@ -381,9 +380,11 @@ wss.on('connection', (ws, req) => {
     }
 
     function handleGameStart(ws, data) {
-        if (!currentRoom || !playerId) return;
+        const player = players.get(ws);
+        if (!player) return;
 
-        const room = rooms.get(currentRoom);
+        const { playerId, roomCode } = player;
+        const room = rooms.get(roomCode);
         if (!room || room.hostPlayerId !== playerId) {
             return ws.send(JSON.stringify({
                 type: 'error',
@@ -417,9 +418,11 @@ wss.on('connection', (ws, req) => {
     }
 
     function handleGameReset(ws, data) {
-        if (!currentRoom || !playerId) return;
+        const player = players.get(ws);
+        if (!player) return;
 
-        const room = rooms.get(currentRoom);
+        const { playerId, roomCode } = player;
+        const room = rooms.get(roomCode);
         if (!room || room.hostPlayerId !== playerId) {
             return ws.send(JSON.stringify({
                 type: 'error',
@@ -452,26 +455,45 @@ wss.on('connection', (ws, req) => {
     }
 
     function handleChatMessage(ws, data) {
+        console.log('🔍 SERVER: handleChatMessage called with data:', data);
+        
         const player = players.get(ws);
+        console.log('🔍 SERVER: Player data found:', player);
+        
         if (!player) {
-            console.log('📱 Chat message from unknown player');
+            console.log('❌ CHAT REJECTED: Player not found in players map');
+            console.log('❌ CHAT REJECTED: Available players:', Array.from(players.keys()).length);
             return;
         }
 
-        const { playerId, currentRoom } = player;
-        const room = rooms.get(currentRoom);
-        if (!room || !room.players.has(playerId)) {
-            console.log('📱 Chat message from player not in room');
+        const { playerId, roomCode } = player;
+        console.log('🔍 SERVER: Player ID:', playerId, 'Room Code:', roomCode);
+        
+        const room = rooms.get(roomCode);
+        console.log('🔍 SERVER: Room found:', room ? room.roomCode : 'null');
+        console.log('🔍 SERVER: Available rooms:', Array.from(rooms.keys()));
+        
+        if (!room) {
+            console.log('❌ CHAT REJECTED: Room not found');
+            return;
+        }
+        
+        if (!room.players.has(playerId)) {
+            console.log('❌ CHAT REJECTED: Player not in room');
+            console.log('❌ CHAT REJECTED: Room players:', Array.from(room.players.keys()));
             return;
         }
 
         const { message } = data;
+        console.log('🔍 SERVER: Message content:', message);
+        
         if (!message || message.length > 200) {
-            console.log('📱 Invalid chat message');
+            console.log('❌ CHAT REJECTED: Invalid message (empty or too long)');
             return;
         }
 
         const roomPlayer = room.players.get(playerId);
+        console.log('🔍 SERVER: Room player found:', roomPlayer ? roomPlayer.name : 'null');
         
         console.log(`📱 Broadcasting chat message from ${roomPlayer.name}: ${message}`);
         
@@ -484,6 +506,8 @@ wss.on('connection', (ws, req) => {
                 timestamp: Date.now()
             }
         });
+        
+        console.log('✅ CHAT SUCCESS: Message broadcasted to room');
     }
 
     function handlePlayerDisconnect(playerId, roomCode) {

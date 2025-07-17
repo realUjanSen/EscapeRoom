@@ -4,6 +4,7 @@ class UIManager {
         this.game = game;
         this.currentScreen = 'main-menu';
         this.isMenuOpen = false;
+        this.roomRefreshInterval = null;
         
         this.initializeUI();
         this.setupEventListeners();
@@ -159,6 +160,9 @@ class UIManager {
 
     // Screen management
     showScreen(screenId) {
+        // Stop any existing room refresh
+        this.stopRoomRefresh();
+        
         // Hide all screens
         document.querySelectorAll('.screen').forEach(screen => {
             screen.style.display = 'none';
@@ -169,6 +173,12 @@ class UIManager {
         if (targetScreen) {
             targetScreen.style.display = 'block';
             this.currentScreen = screenId;
+        }
+
+        // Start room refresh if on join-room screen
+        if (screenId === 'join-room') {
+            this.loadRooms();
+            this.startRoomRefresh();
         }
 
         // Update navigation state
@@ -195,8 +205,11 @@ class UIManager {
             return;
         }
         
+        // Check if private room checkbox is checked
+        const isPrivate = document.getElementById('privateRoomCheckbox')?.checked || false;
+        
         // Create room directly (IP selection is optional for power users)
-        this.createRoom(playerName, false);
+        this.createRoom(playerName, isPrivate);
     }
     
     showJoinRoomScreen() {
@@ -872,6 +885,63 @@ class UIManager {
             }
             
             this.showScreen('join-room');
+        }
+    }
+
+    // Auto-refresh functionality for room list
+    startRoomRefresh() {
+        this.stopRoomRefresh(); // Clear any existing interval
+        this.roomRefreshInterval = setInterval(() => {
+            this.loadRooms();
+        }, 5000); // Refresh every 5 seconds
+    }
+
+    stopRoomRefresh() {
+        if (this.roomRefreshInterval) {
+            clearInterval(this.roomRefreshInterval);
+            this.roomRefreshInterval = null;
+        }
+    }
+
+    async loadRooms() {
+        console.log('📋 DEBUG: loadRooms called');
+        const roomList = document.getElementById('room-list');
+        const loadingIndicator = document.getElementById('rooms-loading');
+        
+        if (!roomList) {
+            console.error('📋 Room list element not found');
+            return;
+        }
+        
+        // Show loading
+        if (loadingIndicator) {
+            loadingIndicator.style.display = 'block';
+        }
+        
+        try {
+            const selectedIP = this.game.getSelectedIP() || 'localhost';
+            console.log('📋 DEBUG: Using IP:', selectedIP);
+            
+            const response = await fetch(`http://${selectedIP}:8080/api/rooms`);
+            console.log('📋 DEBUG: Response status:', response.status);
+            
+            const data = await response.json();
+            console.log('📋 DEBUG: Response data:', data);
+            
+            if (data.success) {
+                console.log('📋 DEBUG: Found rooms:', data.rooms);
+                this.displayRooms(data.rooms);
+            } else {
+                console.error('📋 DEBUG: API returned error:', data);
+                this.showError('Failed to load rooms');
+            }
+        } catch (error) {
+            console.error('📋 Error fetching rooms:', error);
+            this.showError('Failed to connect to server');
+        } finally {
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'none';
+            }
         }
     }
 

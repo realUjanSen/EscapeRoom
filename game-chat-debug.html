@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Chat Debug Test</title>
+    <title>Game Chat Debug</title>
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; }
         .debug-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; background: #f9f9f9; }
@@ -12,33 +12,27 @@
     </style>
 </head>
 <body>
-    <h1>Chat Debug Test - Game Flow Simulation</h1>
+    <h1>Game Chat Debug - Exactly Like Your Game</h1>
     
     <div class="debug-section">
-        <h3>Step 1: WebSocket Connection</h3>
-        <button onclick="testWebSocketConnection()">Test WebSocket</button>
+        <h3>Step 1: Connect to WebSocket</h3>
+        <button onclick="testWebSocketConnection()">Connect WebSocket</button>
         <div id="wsStatus" class="status">Not connected</div>
     </div>
     
     <div class="debug-section">
-        <h3>Step 2: Room Management</h3>
+        <h3>Step 2: CREATE New Room (Don't Join 8LWJZZ - It's Gone!)</h3>
         <input type="text" id="playerName" value="TestPlayer" placeholder="Player Name">
-        <button onclick="createRoom()">Create Room</button>
-        <button onclick="joinRoom()">Join Room (8LWJZZ)</button>
+        <button onclick="createRoom()">Create NEW Room</button>
+        <button onclick="joinRoom()">Try Join 8LWJZZ (Will Fail)</button>
         <div id="roomStatus" class="status">Not in room</div>
     </div>
     
     <div class="debug-section">
-        <h3>Step 3: Chat Test</h3>
+        <h3>Step 3: Send Chat Messages</h3>
         <input type="text" id="chatMessage" placeholder="Type your message...">
         <button onclick="sendChatMessage()">Send Chat</button>
-        <button onclick="sendMultipleMessages()">Send Multiple Messages</button>
-    </div>
-    
-    <div class="debug-section">
-        <h3>Step 4: Game State Check</h3>
-        <button onclick="checkGameState()">Check Game State</button>
-        <button onclick="simulateGameFlow()">Simulate Full Game Flow</button>
+        <div id="chatStatus" class="status">Ready to send</div>
     </div>
     
     <div class="debug-section">
@@ -51,8 +45,6 @@
         let ws = null;
         let connected = false;
         let roomJoined = false;
-        let playerId = null;
-        let roomCode = null;
         
         function log(message) {
             const logDiv = document.getElementById('debugLog');
@@ -63,47 +55,42 @@
             console.log(entry);
         }
         
-        function updateStatus(elementId, message) {
-            document.getElementById(elementId).textContent = message;
-        }
-        
         function testWebSocketConnection() {
             if (ws) {
                 ws.close();
             }
             
-            log('🔌 Testing WebSocket connection to localhost:8080');
+            log('🔌 Connecting to WebSocket at ws://localhost:8080...');
+            document.getElementById('wsStatus').textContent = 'Connecting...';
             
             ws = new WebSocket('ws://localhost:8080');
             
             ws.onopen = function() {
                 log('✅ WebSocket connected successfully');
-                updateStatus('wsStatus', 'Connected');
+                document.getElementById('wsStatus').textContent = 'Connected';
                 connected = true;
             };
             
             ws.onmessage = function(event) {
-                log(`📨 Received: ${event.data}`);
+                log(`📨 Received from server: ${event.data}`);
                 
                 try {
                     const data = JSON.parse(event.data);
                     
                     if (data.type === 'room_created') {
                         roomJoined = true;
-                        roomCode = data.data.roomCode;
-                        playerId = data.data.playerId;
-                        log(`🏠 Room created successfully: ${roomCode}`);
-                        updateStatus('roomStatus', `Room created: ${roomCode}`);
+                        log(`🏠 Successfully created room: ${data.data.roomCode}`);
+                        document.getElementById('roomStatus').textContent = `Created room: ${data.data.roomCode}`;
                     } else if (data.type === 'room_joined') {
                         roomJoined = true;
-                        roomCode = data.data.roomCode;
-                        playerId = data.data.playerId;
-                        log(`🏠 Room joined successfully: ${roomCode}`);
-                        updateStatus('roomStatus', `Room joined: ${roomCode}`);
+                        log(`🏠 Successfully joined room: ${data.data.roomCode}`);
+                        document.getElementById('roomStatus').textContent = `Joined room: ${data.data.roomCode}`;
                     } else if (data.type === 'chat_message') {
                         log(`💬 CHAT RECEIVED: [${data.data.playerName}] ${data.data.message}`);
+                        document.getElementById('chatStatus').textContent = 'Chat message received!';
                     } else if (data.type === 'error') {
-                        log(`❌ Error: ${data.message}`);
+                        log(`❌ Server error: ${data.message}`);
+                        document.getElementById('chatStatus').textContent = `Error: ${data.message}`;
                     }
                 } catch (e) {
                     log(`❌ Failed to parse server message: ${e.message}`);
@@ -112,13 +99,13 @@
             
             ws.onclose = function() {
                 log('❌ WebSocket disconnected');
-                updateStatus('wsStatus', 'Disconnected');
+                document.getElementById('wsStatus').textContent = 'Disconnected';
                 connected = false;
             };
             
             ws.onerror = function(error) {
                 log(`❌ WebSocket error: ${error}`);
-                updateStatus('wsStatus', 'Error');
+                document.getElementById('wsStatus').textContent = 'Error';
             };
         }
         
@@ -143,9 +130,11 @@
                 timestamp: Date.now()
             };
             
-            log(`🏠 Creating room for player: ${playerName}`);
+            log(`🏠 Creating NEW room as player: ${playerName}`);
             log(`📤 Sending: ${JSON.stringify(message)}`);
+            
             ws.send(JSON.stringify(message));
+            document.getElementById('roomStatus').textContent = 'Creating room...';
         }
         
         function joinRoom() {
@@ -169,19 +158,23 @@
                 timestamp: Date.now()
             };
             
-            log(`🏠 Joining room 8LWJZZ as player: ${playerName}`);
+            log(`🏠 Attempting to join room 8LWJZZ as player: ${playerName}`);
             log(`📤 Sending: ${JSON.stringify(message)}`);
+            
             ws.send(JSON.stringify(message));
+            document.getElementById('roomStatus').textContent = 'Joining room...';
         }
         
         function sendChatMessage() {
             if (!connected) {
                 log('❌ WebSocket not connected');
+                document.getElementById('chatStatus').textContent = 'Not connected';
                 return;
             }
             
             if (!roomJoined) {
-                log('❌ Not in a room - create or join a room first');
+                log('❌ Not in a room - must join room first');
+                document.getElementById('chatStatus').textContent = 'Not in room';
                 return;
             }
             
@@ -202,81 +195,17 @@
             };
             
             log(`💬 Sending chat message: "${messageText}"`);
-            log(`📤 Raw message: ${JSON.stringify(message)}`);
+            log(`📤 Raw message data: ${JSON.stringify(message)}`);
             
             try {
                 ws.send(JSON.stringify(message));
                 log('✅ Chat message sent to server');
                 document.getElementById('chatMessage').value = '';
+                document.getElementById('chatStatus').textContent = 'Message sent!';
             } catch (error) {
                 log(`❌ Failed to send chat message: ${error.message}`);
+                document.getElementById('chatStatus').textContent = 'Send failed';
             }
-        }
-        
-        function sendMultipleMessages() {
-            if (!connected || !roomJoined) {
-                log('❌ Need to be connected and in a room first');
-                return;
-            }
-            
-            const messages = [
-                'Test message 1',
-                'Test message 2',
-                'Test message 3'
-            ];
-            
-            messages.forEach((msg, index) => {
-                setTimeout(() => {
-                    const message = {
-                        type: 'chat_message',
-                        data: {
-                            message: msg,
-                            playerName: document.getElementById('playerName').value,
-                            timestamp: Date.now()
-                        },
-                        timestamp: Date.now()
-                    };
-                    
-                    log(`💬 Sending test message ${index + 1}: "${msg}"`);
-                    ws.send(JSON.stringify(message));
-                }, index * 500);
-            });
-        }
-        
-        function checkGameState() {
-            log('🔍 Current game state:');
-            log(`- WebSocket connected: ${connected}`);
-            log(`- Room joined: ${roomJoined}`);
-            log(`- Room code: ${roomCode}`);
-            log(`- Player ID: ${playerId}`);
-            log(`- WebSocket ready state: ${ws ? ws.readyState : 'null'}`);
-            log(`- WebSocket OPEN constant: ${WebSocket.OPEN}`);
-        }
-        
-        function simulateGameFlow() {
-            log('🎮 Simulating full game flow...');
-            
-            // Step 1: Connect
-            testWebSocketConnection();
-            
-            // Step 2: Create room (after connection)
-            setTimeout(() => {
-                if (connected) {
-                    createRoom();
-                } else {
-                    log('❌ Connection failed, cannot create room');
-                }
-            }, 1000);
-            
-            // Step 3: Send test chat (after room creation)
-            setTimeout(() => {
-                if (roomJoined) {
-                    document.getElementById('chatMessage').value = 'Automated test message';
-                    sendChatMessage();
-                } else {
-                    log('❌ Room not joined, cannot send chat');
-                }
-            }, 2000);
         }
         
         function clearLog() {
@@ -293,6 +222,13 @@
         // Auto-connect on page load
         window.onload = function() {
             testWebSocketConnection();
+            
+            // Auto-create room after connection
+            setTimeout(() => {
+                if (connected) {
+                    createRoom();
+                }
+            }, 1000);
         };
     </script>
 </body>

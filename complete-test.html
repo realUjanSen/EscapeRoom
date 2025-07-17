@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Complete Game Flow Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .section { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+        .log { background: #f0f0f0; padding: 10px; height: 200px; overflow-y: auto; margin: 10px 0; }
+        button { margin: 5px; padding: 8px 12px; }
+        input { margin: 5px; padding: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Complete Game Flow Test</h1>
+    
+    <div class="section">
+        <h3>1. WebSocket Connection</h3>
+        <button onclick="connectToServer()">Connect to Server</button>
+        <div id="connectionStatus">Disconnected</div>
+    </div>
+    
+    <div class="section">
+        <h3>2. Create Room</h3>
+        <input type="text" id="playerName" value="TestPlayer" placeholder="Player Name">
+        <button onclick="createRoom()">Create Room</button>
+        <div id="roomStatus">No room</div>
+    </div>
+    
+    <div class="section">
+        <h3>3. Send Chat Messages</h3>
+        <input type="text" id="chatMessage" placeholder="Type a message...">
+        <button onclick="sendChatMessage()">Send Chat</button>
+        <button onclick="sendTestMessages()">Send Test Messages</button>
+    </div>
+    
+    <div class="section">
+        <h3>4. Server Activity Log</h3>
+        <div id="log" class="log"></div>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+    
+    <script>
+        let ws = null;
+        let connected = false;
+        let roomCreated = false;
+        let roomCode = null;
+        
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `<div>[${time}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function updateConnectionStatus(status) {
+            document.getElementById('connectionStatus').textContent = status;
+        }
+        
+        function updateRoomStatus(status) {
+            document.getElementById('roomStatus').textContent = status;
+        }
+        
+        function connectToServer() {
+            if (ws) {
+                ws.close();
+            }
+            
+            log('🔌 Connecting to WebSocket server...');
+            updateConnectionStatus('Connecting...');
+            
+            ws = new WebSocket('ws://localhost:8080');
+            
+            ws.onopen = function() {
+                log('✅ Connected to WebSocket server');
+                updateConnectionStatus('Connected');
+                connected = true;
+            };
+            
+            ws.onmessage = function(event) {
+                log(`📨 Received: ${event.data}`);
+                
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.type === 'room_created') {
+                        roomCreated = true;
+                        roomCode = data.data.roomCode;
+                        log(`🏠 Room created: ${roomCode}`);
+                        updateRoomStatus(`Room created: ${roomCode}`);
+                    } else if (data.type === 'chat_message') {
+                        log(`💬 CHAT: ${data.data.playerName}: ${data.data.message}`);
+                    } else if (data.type === 'pong') {
+                        log('🏓 Received pong');
+                    } else if (data.type === 'error') {
+                        log(`❌ Error: ${data.message}`);
+                    }
+                } catch (e) {
+                    log(`❌ Failed to parse message: ${e.message}`);
+                }
+            };
+            
+            ws.onclose = function() {
+                log('❌ WebSocket disconnected');
+                updateConnectionStatus('Disconnected');
+                connected = false;
+            };
+            
+            ws.onerror = function(error) {
+                log(`❌ WebSocket error: ${error}`);
+                updateConnectionStatus('Error');
+            };
+        }
+        
+        function createRoom() {
+            if (!connected) {
+                log('❌ Not connected to server');
+                return;
+            }
+            
+            const playerName = document.getElementById('playerName').value.trim();
+            if (!playerName) {
+                log('❌ Please enter a player name');
+                return;
+            }
+            
+            const message = {
+                type: 'create_room',
+                data: {
+                    playerName: playerName,
+                    isPrivate: false
+                }
+            };
+            
+            log(`🏠 Creating room for player: ${playerName}`);
+            ws.send(JSON.stringify(message));
+        }
+        
+        function sendChatMessage() {
+            if (!connected) {
+                log('❌ Not connected to server');
+                return;
+            }
+            
+            if (!roomCreated) {
+                log('❌ No room created yet');
+                return;
+            }
+            
+            const messageText = document.getElementById('chatMessage').value.trim();
+            if (!messageText) {
+                log('❌ Please enter a message');
+                return;
+            }
+            
+            const message = {
+                type: 'chat_message',
+                data: {
+                    message: messageText,
+                    playerName: document.getElementById('playerName').value,
+                    timestamp: Date.now()
+                }
+            };
+            
+            log(`📤 Sending chat: "${messageText}"`);
+            ws.send(JSON.stringify(message));
+            document.getElementById('chatMessage').value = '';
+        }
+        
+        function sendTestMessages() {
+            if (!connected || !roomCreated) {
+                log('❌ Need to be connected and in a room first');
+                return;
+            }
+            
+            const testMessages = [
+                'Hello, this is a test message!',
+                'Testing chat system...',
+                'This should appear in the chat log',
+                'Final test message'
+            ];
+            
+            testMessages.forEach((msg, index) => {
+                setTimeout(() => {
+                    const message = {
+                        type: 'chat_message',
+                        data: {
+                            message: msg,
+                            playerName: document.getElementById('playerName').value,
+                            timestamp: Date.now()
+                        }
+                    };
+                    
+                    log(`📤 Sending test message ${index + 1}: "${msg}"`);
+                    ws.send(JSON.stringify(message));
+                }, index * 1000);
+            });
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        // Allow Enter key to send chat message
+        document.getElementById('chatMessage').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendChatMessage();
+            }
+        });
+        
+        // Auto-connect on page load
+        window.onload = function() {
+            connectToServer();
+        };
+    </script>
+</body>
+</html>

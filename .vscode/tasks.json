@@ -4,14 +4,14 @@
     {
       "label": "Start Escape Room Server",
       "type": "shell",
-      "command": "bash",
-      "args": [
-        "-c",
-        "fuser -k 8080/tcp || true && npm start"
-      ],
+      "command": "npm",
+      "args": ["start"],
       "problemMatcher": [],
       "group": "build",
-      "isBackground": false
+      "isBackground": false,
+      "options": {
+        "cwd": "${workspaceFolder}"
+      }
     }
   ]
 }

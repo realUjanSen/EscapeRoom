@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Direct WebSocket Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .log { background: #f0f0f0; padding: 10px; height: 300px; overflow-y: auto; margin: 10px 0; border: 1px solid #ccc; }
+        .controls { margin: 10px 0; }
+        input { padding: 5px; margin: 5px; }
+        button { padding: 5px 10px; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Direct WebSocket Chat Test</h1>
+    <div id="log" class="log"></div>
+    <div class="controls">
+        <input type="text" id="messageInput" placeholder="Type a message..." style="width: 300px;">
+        <button onclick="sendMessage()">Send Message</button>
+        <button onclick="joinRoom()">Create Room</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <script>
+        const ws = new WebSocket('ws://localhost:8080');
+        let connected = false;
+        let roomJoined = false;
+        
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `<div>[${time}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        ws.onopen = function() {
+            log('✅ WebSocket connected');
+            connected = true;
+        };
+        
+        ws.onmessage = function(event) {
+            log(`📨 Received: ${event.data}`);
+            
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'chat_message') {
+                    log(`💬 CHAT MESSAGE: ${data.data.playerName}: ${data.data.message}`);
+                } else if (data.type === 'room_created') {
+                    log(`🏠 ROOM CREATED: ${data.data.roomCode}`);
+                    roomJoined = true;
+                    // Auto-send a test chat message
+                    setTimeout(() => {
+                        document.getElementById('messageInput').value = 'Test message from room creator';
+                        sendMessage();
+                    }, 1000);
+                } else if (data.type === 'ping') {
+                    log(`🏓 PING received`);
+                } else if (data.type === 'pong') {
+                    log(`🏓 PONG received`);
+                } else if (data.type === 'error') {
+                    log(`❌ ERROR: ${data.message}`);
+                }
+            } catch (e) {
+                log(`❌ Failed to parse message: ${e.message}`);
+            }
+        };
+        
+        ws.onclose = function(event) {
+            log(`❌ WebSocket closed: ${event.code} - ${event.reason}`);
+            connected = false;
+        };
+        
+        ws.onerror = function(error) {
+            log(`❌ WebSocket error: ${error}`);
+        };
+        
+        function joinRoom() {
+            if (!connected) {
+                log('❌ Not connected to WebSocket');
+                return;
+            }
+            
+            const createMessage = {
+                type: 'create_room',
+                data: {
+                    playerName: 'TestPlayer',
+                    isPrivate: false
+                }
+            };
+            
+            ws.send(JSON.stringify(createMessage));
+            log(`📤 Sent create room message`);
+        }
+        
+        function sendMessage() {
+            if (!connected) {
+                log('❌ Not connected to WebSocket');
+                return;
+            }
+            
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            if (!message) {
+                log('❌ Empty message');
+                return;
+            }
+            
+            const chatMessage = {
+                type: 'chat_message',
+                data: {
+                    message: message,
+                    playerName: 'TestPlayer',
+                    timestamp: Date.now()
+                }
+            };
+            
+            ws.send(JSON.stringify(chatMessage));
+            log(`📤 Sent chat message: "${message}"`);
+            input.value = '';
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        // Allow Enter key to send message
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>

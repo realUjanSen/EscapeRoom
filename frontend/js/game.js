@@ -11,6 +11,8 @@ class EscapeRoomGame {
         this.currentPosition = { x: 100, y: 100 };
         this.selectedIP = null;
         this.wsPort = 8080;
+        this.currentScreen = 'mainMenu';
+        this.roomListUpdateInterval = null;
         
         // Game canvas and context
         this.canvas = null;
@@ -317,10 +319,15 @@ class EscapeRoomGame {
     }
 
     leaveRoom() {
+        console.log('🚪 DEBUG: leaveRoom called');
         if (this.isConnectedToServer() && this.roomCode) {
+            console.log('🚪 DEBUG: Sending leave_room message');
             this.sendMessage('leave_room', {});
         }
         this.resetGameState();
+        
+        // Switch back to main menu
+        this.switchToMainMenu();
     }
 
     startGame() {
@@ -462,8 +469,18 @@ class EscapeRoomGame {
         }
     }
 
-    handleInteraction(gameObject) {
+    handleInteraction(gameObject = null) {
         if (!this.gameStarted) return;
+        
+        // If no game object provided, find nearby interactable objects
+        if (!gameObject) {
+            const nearbyObjects = this.findNearbyInteractables();
+            if (nearbyObjects.length === 0) {
+                this.showNotification('Nothing to interact with nearby', 'info');
+                return;
+            }
+            gameObject = nearbyObjects[0];
+        }
         
         // Check if player is close enough to interact
         const distance = this.getDistance(this.currentPosition, {
@@ -550,13 +567,6 @@ class EscapeRoomGame {
                 break;
             }
         }
-    }
-
-    isPositionInObject(position, object) {
-        return position.x >= object.x &&
-               position.x <= object.x + object.width &&
-               position.y >= object.y &&
-               position.y <= object.y + object.height;
     }
 
     gameLoop() {
@@ -838,6 +848,11 @@ class EscapeRoomGame {
     switchToGameView() {
         console.log(`🔍 DEBUG: switchToGameView called`);
         
+        this.currentScreen = 'game';
+        
+        // Stop room list updates
+        this.stopRoomListUpdates();
+        
         // Hide menu screens
         document.querySelectorAll('.screen').forEach(screen => {
             console.log(`🔍 DEBUG: Hiding screen:`, screen.id);
@@ -879,8 +894,88 @@ class EscapeRoomGame {
         this.setupGameEventListeners();
     }
 
+    initializeGameObjects() {
+        console.log('🔍 DEBUG: initializeGameObjects called');
+        
+        // Initialize any game objects, obstacles, items, etc.
+        // This is where you would set up the game world
+        
+        // For now, this is a placeholder method
+        // You can expand this later to add:
+        // - Game objects (doors, keys, puzzles, etc.)
+        // - Interactive elements
+        // - Obstacles
+        // - Items
+        
+        console.log('🎮 Game objects initialized');
+    }
+
+    setupGameEventListeners() {
+        console.log('🔍 DEBUG: setupGameEventListeners called');
+        
+        // Setup keyboard event listeners for game controls
+        document.addEventListener('keydown', (e) => this.handleKeyDown(e));
+        document.addEventListener('keyup', (e) => this.handleKeyUp(e));
+        
+        // Setup mouse event listeners for game interactions
+        const gameWorld = document.getElementById('gameWorld');
+        if (gameWorld) {
+            gameWorld.addEventListener('click', (e) => this.handleGameClick(e));
+        }
+        
+        console.log('🎮 Game event listeners setup complete');
+    }
+
+    handleGameClick(e) {
+        console.log('🔍 DEBUG: handleGameClick called', e);
+        
+        // Handle game world clicks
+        // This could be used for:
+        // - Moving player to clicked position
+        // - Interacting with objects
+        // - Placing items
+        
+        // For now, this is a placeholder
+        const rect = e.target.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        console.log('🎮 Game click at:', x, y);
+    }
+
+    switchToMainMenu() {
+        console.log('🏠 DEBUG: switchToMainMenu called');
+        
+        this.currentScreen = 'mainMenu';
+        
+        // Hide all screens
+        document.querySelectorAll('.screen').forEach(screen => {
+            screen.style.display = 'none';
+        });
+        
+        // Show main menu
+        const mainMenuScreen = document.getElementById('mainMenuScreen');
+        if (mainMenuScreen) {
+            mainMenuScreen.style.display = 'block';
+            console.log('🏠 DEBUG: Main menu shown');
+        } else {
+            console.error('🏠 DEBUG: Main menu screen not found');
+        }
+        
+        // Clear any session data
+        this.clearSessionData();
+        
+        // Start room list updates
+        this.startRoomListUpdates();
+    }
+
     switchToLobbyView() {
         console.log(`🔍 DEBUG: switchToLobbyView called`);
+        
+        this.currentScreen = 'lobby';
+        
+        // Stop room list updates
+        this.stopRoomListUpdates();
         
         // Hide all screens
         document.querySelectorAll('.screen').forEach(screen => {
@@ -1068,41 +1163,62 @@ class EscapeRoomGame {
     }
     
     sendChatMessage() {
-        console.log('📱 DEBUG: sendChatMessage called');
+        console.log('� CLIENT: sendChatMessage called');
+        
         const chatInput = document.getElementById('chatInput');
+        console.log('🔍 CLIENT: Chat input found:', !!chatInput);
+        
         if (!chatInput) {
-            console.error('📱 Chat input not found');
+            console.error('❌ CLIENT: Chat input not found');
             return;
         }
         
         const message = chatInput.value.trim();
-        console.log('📱 DEBUG: Message value:', message);
+        console.log('� CLIENT: Message value:', message);
+        
         if (!message) {
-            console.log('📱 Empty message, not sending');
+            console.log('❌ CLIENT: Empty message, not sending');
             return;
         }
         
-        console.log('📱 Sending chat message:', message);
+        console.log('� CLIENT: Checking WebSocket connection...');
+        console.log('🔍 CLIENT: this.wsClient exists:', !!this.wsClient);
+        console.log('🔍 CLIENT: WebSocket connected:', this.wsClient?.isConnected());
+        console.log('🔍 CLIENT: WebSocket readyState:', this.wsClient?.ws?.readyState);
+        console.log('🔍 CLIENT: WebSocket OPEN constant:', WebSocket.OPEN);
         
         if (this.wsClient && this.wsClient.isConnected()) {
-            console.log('📱 DEBUG: WebSocket connected, sending message');
+            console.log('� CLIENT: WebSocket connected, preparing message');
+            
+            const playerName = this.players.get(this.playerId)?.name || 'Unknown';
+            console.log('🔍 CLIENT: Player name:', playerName);
+            console.log('🔍 CLIENT: Player ID:', this.playerId);
+            
             const messageData = { 
                 message: message,
-                playerName: this.players.get(this.playerId)?.name || 'Unknown',
+                playerName: playerName,
                 timestamp: Date.now()
             };
-            console.log('📱 DEBUG: Message data:', messageData);
+            console.log('� CLIENT: Message data:', messageData);
             
+            console.log('🔍 CLIENT: Sending message via WebSocket...');
             const success = this.wsClient.sendMessage('chat_message', messageData);
+            
+            console.log('🔍 CLIENT: Send result:', success);
             
             if (success) {
                 chatInput.value = '';
-                console.log('📱 Chat message sent successfully');
+                console.log('✅ CLIENT: Chat message sent successfully');
             } else {
-                console.error('📱 Failed to send chat message');
+                console.error('❌ CLIENT: Failed to send chat message');
             }
         } else {
-            console.error('📱 WebSocket not connected, cannot send chat message');
+            console.error('❌ CLIENT: WebSocket not connected, cannot send chat message');
+            console.error('❌ CLIENT: Connection details:');
+            console.error('  - wsClient exists:', !!this.wsClient);
+            console.error('  - isConnected:', this.wsClient?.isConnected());
+            console.error('  - ws exists:', !!this.wsClient?.ws);
+            console.error('  - ws readyState:', this.wsClient?.ws?.readyState);
         }
     }
 
@@ -1333,27 +1449,46 @@ class EscapeRoomGame {
     }
 
     setupChatControls() {
+        console.log('📱 DEBUG: setupChatControls called');
         const chatInput = document.getElementById('chatInput');
         const sendChatBtn = document.getElementById('sendChatBtn');
         
+        console.log('📱 DEBUG: chatInput found:', !!chatInput);
+        console.log('📱 DEBUG: sendChatBtn found:', !!sendChatBtn);
+        
         if (chatInput) {
-            // Handle Enter key to send messages
-            chatInput.addEventListener('keydown', (e) => {
+            // Remove any existing event listeners
+            chatInput.removeEventListener('keydown', this.chatKeyHandler);
+            
+            // Create bound handler
+            this.chatKeyHandler = (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
+                    console.log('📱 DEBUG: Enter key pressed in chat');
                     this.sendChatMessage();
                 }
-            });
+            };
+            
+            // Add event listener
+            chatInput.addEventListener('keydown', this.chatKeyHandler);
+            console.log('📱 DEBUG: Enter key handler added to chat input');
         }
         
         if (sendChatBtn) {
-            // Handle send button click
-            sendChatBtn.addEventListener('click', (e) => {
+            // Remove any existing event listeners
+            sendChatBtn.removeEventListener('click', this.chatClickHandler);
+            
+            // Create bound handler
+            this.chatClickHandler = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 console.log('📱 DEBUG: Send chat button clicked');
                 this.sendChatMessage();
-            });
+            };
+            
+            // Add event listener
+            sendChatBtn.addEventListener('click', this.chatClickHandler);
+            console.log('📱 DEBUG: Click handler added to send chat button');
         }
     }
 
@@ -1382,6 +1517,97 @@ class EscapeRoomGame {
         chatMessages.scrollTop = chatMessages.scrollHeight;
         
         console.log('📱 Added chat message to UI:', { playerName, message, timestamp });
+    }
+    
+    // Room list functionality
+    loadPublicRooms() {
+        console.log('🔍 DEBUG: Loading public rooms');
+        fetch('http://localhost:8080/api/rooms')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    this.displayPublicRooms(data.rooms);
+                } else {
+                    console.error('Failed to load rooms:', data.message);
+                    this.showRoomListError('Failed to load rooms');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading rooms:', error);
+                this.showRoomListError('Unable to connect to server');
+            });
+    }
+    
+    displayPublicRooms(rooms) {
+        const publicRoomsContainer = document.getElementById('publicRooms');
+        if (!publicRoomsContainer) return;
+        
+        if (rooms.length === 0) {
+            publicRoomsContainer.innerHTML = '<div class="no-rooms">No public rooms available. Create one to get started!</div>';
+            return;
+        }
+        
+        publicRoomsContainer.innerHTML = rooms.map(room => `
+            <div class="room-item ${room.gameStarted ? 'game-started' : 'waiting'}" data-room-code="${room.roomCode}">
+                <div class="room-header">
+                    <span class="room-code">${room.roomCode}</span>
+                    <span class="room-status ${room.gameStarted ? 'playing' : 'waiting'}">
+                        ${room.gameStarted ? '🎮 Playing' : '⏳ Waiting'}
+                    </span>
+                </div>
+                <div class="room-info">
+                    <div class="room-details">
+                        <span class="player-count">👥 ${room.playerCount}/${room.maxPlayers}</span>
+                        <span class="host-name">Host: ${room.hostName}</span>
+                    </div>
+                    <button class="join-room-btn btn btn-small" 
+                            data-room-code="${room.roomCode}" 
+                            ${room.gameStarted ? 'disabled' : ''}>
+                        ${room.gameStarted ? 'Game in Progress' : 'Join Room'}
+                    </button>
+                </div>
+            </div>
+        `).join('');
+        
+        // Add click handlers for join buttons
+        publicRoomsContainer.querySelectorAll('.join-room-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const roomCode = e.target.getAttribute('data-room-code');
+                if (roomCode && !e.target.disabled) {
+                    this.joinRoom(roomCode);
+                }
+            });
+        });
+    }
+    
+    showRoomListError(message) {
+        const publicRoomsContainer = document.getElementById('publicRooms');
+        if (publicRoomsContainer) {
+            publicRoomsContainer.innerHTML = `<div class="error-message">${message}</div>`;
+        }
+    }
+    
+    startRoomListUpdates() {
+        // Load rooms immediately
+        this.loadPublicRooms();
+        
+        // Set up periodic updates every 5 seconds
+        if (this.roomListUpdateInterval) {
+            clearInterval(this.roomListUpdateInterval);
+        }
+        
+        this.roomListUpdateInterval = setInterval(() => {
+            if (this.currentScreen === 'mainMenu') {
+                this.loadPublicRooms();
+            }
+        }, 5000);
+    }
+    
+    stopRoomListUpdates() {
+        if (this.roomListUpdateInterval) {
+            clearInterval(this.roomListUpdateInterval);
+            this.roomListUpdateInterval = null;
+        }
     }
 }
 
