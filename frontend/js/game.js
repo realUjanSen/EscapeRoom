@@ -1315,17 +1315,10 @@ class EscapeRoomGame {
         this.playerId = sessionData.playerId;
         this.isHost = sessionData.isHost;
         
-        // Connect to WebSocket and rejoin room
-        this.wsClient.connect('localhost').then(() => {
-            console.log('💾 Reconnected to WebSocket, rejoining room...');
-            this.sendMessage('join_room', {
-                roomCode: this.roomCode,
-                playerName: sessionData.playerName
-            });
-        }).catch(error => {
-            console.error('💾 Failed to reconnect:', error);
-            this.clearSessionData();
-        });
+        // Don't automatically try to reconnect - let the user choose to reconnect manually
+        // The connection errors are too disruptive for automatic reconnection
+        console.log('💾 Session found but skipping automatic reconnection to avoid connection errors');
+        this.clearSessionData();
         
         return true;
     }
