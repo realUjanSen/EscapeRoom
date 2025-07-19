@@ -923,6 +923,14 @@ class EscapeRoomGame {
             gameWorld.addEventListener('click', (e) => this.handleGameClick(e));
         }
         
+        // Setup leave game button
+        const leaveGameBtn = document.getElementById('leaveGameBtn');
+        if (leaveGameBtn) {
+            leaveGameBtn.removeEventListener('click', this.handleLeaveGame.bind(this));
+            leaveGameBtn.addEventListener('click', this.handleLeaveGame.bind(this));
+            console.log('🚪 DEBUG: Leave game button event listener added');
+        }
+        
         console.log('🎮 Game event listeners setup complete');
     }
 
@@ -1139,9 +1147,11 @@ class EscapeRoomGame {
     }
 
     handleLeaveLobby() {
-        if (confirm('Are you sure you want to leave the room?')) {
-            this.leaveRoom();
-        }
+        this.leaveRoom();
+    }
+
+    handleLeaveGame() {
+        this.leaveRoom();
     }
 
     handleCopyRoomUrl() {

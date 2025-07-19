@@ -673,6 +673,7 @@ body {
     bottom: 0;
     background: #1a1a2e;
     display: none;
+    padding: 0 2rem;
 }
 
 .game-header {

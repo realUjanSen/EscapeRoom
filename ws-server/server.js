@@ -564,8 +564,8 @@ server.listen(PORT, HOST, () => {
     getNetworkInterfaces().forEach(iface => {
         console.log(`  ${iface.name}: ${iface.address}`);
     });
-    console.log(`Local access: http://localhost:${PORT}`);
-    console.log(`LAN access: Use one of the IP addresses above with port ${PORT}`);
+    console.log(`Local access: http://localhost:3000`);
+    console.log(`LAN access: Use one of the IP addresses above with port 3000. 8080 is for WebSocket connections; don't use it in the browser`);
 });
 
 module.exports = { server, wss, rooms, players };

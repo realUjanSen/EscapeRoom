@@ -8,7 +8,7 @@
     "dev": "nodemon ws-server/server.js",
     "ws-server": "cd ws-server; npm start",
     "php-server": "php -S 0.0.0.0:3000",
-    "install-deps": "npm install && cd ws-server && npm install && composer install"
+    "install-deps": "npm install; cd ws-server; npm install; composer install"
   },
   "keywords": ["websocket", "multiplayer", "game", "escape-room", "2d", "real-time"],
   "author": "",

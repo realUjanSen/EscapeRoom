@@ -72,7 +72,7 @@
                 <div class="join-section">
                     <input type="text" id="roomCode" placeholder="Room Code (6 digits)" maxlength="6" pattern="[A-Z0-9]{6}">
                     <button id="joinRoomBtn" class="btn btn-secondary">
-                        <span class="btn-icon">🚪</span>
+                        <span class="btn-icon">Exit</span>
                         Join Room
                     </button>
                 </div>
@@ -151,9 +151,9 @@
                 <span class="room-code-small">Room: <span id="gameRoomCode"></span></span>
             </div>
             <div class="game-controls">
-                <button id="pauseBtn" class="control-btn">⏸️</button>
-                <button id="helpBtn" class="control-btn">❓</button>
-                <button id="leaveGameBtn" class="control-btn">🚪</button>
+                <button id="pauseBtn" class="control-btn" title="Pause Game">⏸️</button>
+                <button id="helpBtn" class="control-btn" title="Help">❓</button>
+                <button id="leaveGameBtn" class="control-btn" title="Leave Room">Exit</button>
             </div>
         </div>
         
@@ -375,7 +375,7 @@
             if (leaveGameBtn) {
                 leaveGameBtn.addEventListener('click', () => {
                     console.log('Leave room button clicked');
-                    if (game && confirm('Are you sure you want to leave the room?')) {
+                    if (game) {
                         game.leaveRoom();
                     }
                 });

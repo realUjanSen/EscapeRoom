@@ -36,9 +36,10 @@ class UIManager {
             this.handleQuickJoin();
         });
 
-        document.getElementById('settingsBtn')?.addEventListener('click', () => {
-            this.showScreen('settings');
-        });
+        // Settings button is handled in escape.html inline script
+        // document.getElementById('settingsBtn')?.addEventListener('click', () => {
+        //     this.showScreen('settings');
+        // });
 
         // Create room form
         document.getElementById('create-room-form')?.addEventListener('submit', (e) => {
@@ -430,10 +431,8 @@ class UIManager {
     }
 
     handleLeaveRoom() {
-        if (confirm('Are you sure you want to leave the room?')) {
-            this.game.leaveRoom();
-            this.showScreen('main-menu');
-        }
+        this.game.leaveRoom();
+        this.showScreen('main-menu');
     }
 
     handleSettingsUpdate() {
