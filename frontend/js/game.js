@@ -26,6 +26,13 @@ class EscapeRoomGame {
         this.lastMoveTime = 0;
         this.moveThrottle = 16; // 60 FPS (16ms between frames)
         
+        // Touch handling
+        this.touchStartTime = 0;
+        this.touchMoved = false;
+        
+        // Click/Touch destination for progressive movement
+        this.destination = null;
+        
         // WebSocket client
         this.wsClient = new WebSocketClient(this);
         
@@ -374,10 +381,32 @@ class EscapeRoomGame {
         let moveY = 0;
         const speed = 3; // Smooth movement with smaller steps
         
+        // Handle keyboard movement (WASD)
         if (this.keys['w'] || this.keys['arrowup']) moveY -= speed;
         if (this.keys['s'] || this.keys['arrowdown']) moveY += speed;
         if (this.keys['a'] || this.keys['arrowleft']) moveX -= speed;
         if (this.keys['d'] || this.keys['arrowright']) moveX += speed;
+        
+        // If player is using keyboard, cancel any click/touch destination
+        if (moveX !== 0 || moveY !== 0) {
+            this.destination = null;
+        }
+        
+        // Handle click/touch destination movement (only if no keyboard input)
+        if (this.destination && moveX === 0 && moveY === 0) {
+            const dx = this.destination.x - this.currentPosition.x;
+            const dy = this.destination.y - this.currentPosition.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // If we're close enough to destination, stop
+            if (distance < speed) {
+                this.destination = null;
+            } else {
+                // Move toward destination
+                moveX = (dx / distance) * speed;
+                moveY = (dy / distance) * speed;
+            }
+        }
         
         if (moveX !== 0 || moveY !== 0) {
             const newX = this.currentPosition.x + moveX;
@@ -920,7 +949,15 @@ class EscapeRoomGame {
         // Setup mouse event listeners for game interactions
         const gameWorld = document.getElementById('gameWorld');
         if (gameWorld) {
+            // Click-to-move support
             gameWorld.addEventListener('click', (e) => this.handleGameClick(e));
+            
+            // Touch support for mobile devices
+            gameWorld.addEventListener('touchstart', (e) => this.handleTouchStart(e));
+            gameWorld.addEventListener('touchmove', (e) => this.handleTouchMove(e));
+            gameWorld.addEventListener('touchend', (e) => this.handleTouchEnd(e));
+            
+            console.log('🎮 Touch and click event listeners added to game world');
         }
         
         // Setup leave game button
@@ -937,18 +974,57 @@ class EscapeRoomGame {
     handleGameClick(e) {
         console.log('🔍 DEBUG: handleGameClick called', e);
         
-        // Handle game world clicks
-        // This could be used for:
-        // - Moving player to clicked position
-        // - Interacting with objects
-        // - Placing items
-        
-        // For now, this is a placeholder
+        // Handle game world clicks for click-to-move
         const rect = e.target.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const clickX = e.clientX - rect.left;
+        const clickY = e.clientY - rect.top;
         
-        console.log('🎮 Game click at:', x, y);
+        console.log('🎮 Game click at:', clickX, clickY);
+        
+        // Set destination for progressive movement instead of teleporting
+        this.destination = { x: clickX, y: clickY };
+        console.log('🎯 Destination set to:', this.destination);
+    }
+
+    handleTouchStart(e) {
+        console.log('🔍 DEBUG: handleTouchStart called');
+        e.preventDefault(); // Prevent scrolling and default touch behavior
+        
+        // Store initial touch position for potential drag detection
+        this.touchStartTime = Date.now();
+        this.touchMoved = false;
+    }
+
+    handleTouchMove(e) {
+        console.log('🔍 DEBUG: handleTouchMove called');
+        e.preventDefault(); // Prevent scrolling
+        this.touchMoved = true; // Mark that touch has moved
+    }
+
+    handleTouchEnd(e) {
+        console.log('🔍 DEBUG: handleTouchEnd called');
+        e.preventDefault();
+        
+        const touchEndTime = Date.now();
+        const touchDuration = touchEndTime - this.touchStartTime;
+        
+        // Only treat as tap if touch was brief and didn't move much
+        if (!this.touchMoved && touchDuration < 500) {
+            const touch = e.changedTouches[0];
+            const rect = e.target.getBoundingClientRect();
+            const touchX = touch.clientX - rect.left;
+            const touchY = touch.clientY - rect.top;
+            
+            console.log('🎮 Touch tap at:', touchX, touchY);
+            
+            // Set destination for progressive movement instead of teleporting
+            this.destination = { x: touchX, y: touchY };
+            console.log('🎯 Touch destination set to:', this.destination);
+        }
+        
+        // Reset touch tracking
+        this.touchStartTime = 0;
+        this.touchMoved = false;
     }
 
     switchToMainMenu() {
