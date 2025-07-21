@@ -49,12 +49,12 @@ class WebSocketClient {
 
     connect(host = 'localhost', port = 8080) {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            console.log('🔍 DEBUG: Already connected to WebSocket');
+            // console.log('🔍 DEBUG: Already connected to WebSocket');
             return Promise.resolve();
         }
         
         if (this.connectionState === 'connecting') {
-            console.log('🔍 DEBUG: Already attempting to connect, waiting...');
+            // console.log('🔍 DEBUG: Already attempting to connect, waiting...');
             return new Promise((resolve, reject) => {
                 const checkConnection = () => {
                     if (this.connectionState === 'connected') {
@@ -458,3 +458,12 @@ class WebSocketClient {
 
 // Export for use in other modules
 window.WebSocketClient = WebSocketClient;
+
+// Commented out debug logs
+const _origConsoleLog = console.log;
+console.log = (...args) => {
+  if (typeof args[0] === 'string' && args[0].startsWith('🔍 DEBUG')) {
+    return;
+  }
+  _origConsoleLog.apply(console, args);
+};

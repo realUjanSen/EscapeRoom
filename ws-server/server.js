@@ -181,6 +181,10 @@ wss.on('connection', (ws, req) => {
                 handleChatMessage(ws, data);
                 break;
                 
+            case 'door_state_change':
+                handleDoorStateChange(ws, data);
+                break;
+                
             case 'ping':
                 // Respond to ping with pong for heartbeat
                 console.log(`🔍 SERVER: Received ping, sending pong`);
@@ -508,6 +512,52 @@ wss.on('connection', (ws, req) => {
         });
         
         console.log('✅ CHAT SUCCESS: Message broadcasted to room');
+    }
+
+    function handleDoorStateChange(ws, data) {
+        console.log('🚪 SERVER: handleDoorStateChange called with data:', data);
+        
+        const player = players.get(ws);
+        if (!player) {
+            console.log('❌ DOOR STATE REJECTED: Player not found');
+            return;
+        }
+
+        const { playerId, roomCode } = player;
+        const room = rooms.get(roomCode);
+        
+        if (!room) {
+            console.log('❌ DOOR STATE REJECTED: Room not found');
+            return;
+        }
+        
+        if (!room.players.has(playerId)) {
+            console.log('❌ DOOR STATE REJECTED: Player not in room');
+            return;
+        }
+
+        const { doorId, isOpen, fromRoom, targetRoom } = data;
+        
+        if (!doorId) {
+            console.log('❌ DOOR STATE REJECTED: Invalid door data');
+            return;
+        }
+
+        console.log(`🚪 Broadcasting door state change: ${doorId} is now ${isOpen ? 'OPEN' : 'CLOSED'}`);
+        
+        // Broadcast door state change to all players in the room (including sender for confirmation)
+        room.broadcast({
+            type: 'door_state_change',
+            data: {
+                doorId,
+                isOpen,
+                fromRoom,
+                targetRoom,
+                changedBy: playerId
+            }
+        });
+        
+        console.log('✅ DOOR STATE SUCCESS: Change broadcasted to room');
     }
 
     function handlePlayerDisconnect(playerId, roomCode) {

@@ -8,7 +8,7 @@ class EscapeRoomGame {
         this.players = new Map();
         this.gameObjects = new Map();
         this.inventory = [];
-        this.currentPosition = { x: 100, y: 100 };
+        this.currentPosition = { x: 200, y: 134 }; // Start in center of NW room (400x268)
         this.selectedIP = null;
         this.wsPort = 8080;
         this.currentScreen = 'mainMenu';
@@ -30,8 +30,37 @@ class EscapeRoomGame {
         this.touchStartTime = 0;
         this.touchMoved = false;
         
+        // Interaction debouncing
+        this.lastInteractionTime = 0;
+        this.interactionCooldown = 300; // 300ms cooldown between interactions
+        
         // Click/Touch destination for progressive movement
         this.destination = null;
+        
+        // Game world dimensions (fixed size that scales to fit screen)
+        this.GAME_WORLD_WIDTH = 800;
+        this.GAME_WORLD_HEIGHT = 536;
+        
+        // Room system
+        this.roomTransitions = {
+            'NW': ['SW'],    // Start only leads to SW
+            'SW': ['SE'],    // SW only leads to SE
+            'SE': ['NE'],    // SE only leads to NE
+            'NE': []         // NE is the final room
+        };
+        this.rooms = new Map();
+        this.currentRoom = 'NW'; // Start in Northwest
+        this.setupRooms(); // Define room bounds
+        
+        // Game state tracking
+        this.gameState = {
+            hasKeyA: false,
+            hasKeyB: false,
+            hasKeyC: false,
+            hasUSB: false,
+            knowsCode: false,
+            guardAsleep: false
+        };
         
         // WebSocket client
         this.wsClient = new WebSocketClient(this);
@@ -237,6 +266,9 @@ class EscapeRoomGame {
             case 'chat_message':
                 this.handleChatMessage(data);
                 break;
+            case 'door_state_change':
+                this.handleDoorStateChange(data);
+                break;
             case 'error':
                 this.showError((data && data.message) || 'An error occurred');
                 break;
@@ -366,6 +398,27 @@ class EscapeRoomGame {
         if (e.key === 'Escape') {
             this.toggleGameMenu();
         }
+        
+        // Check for doors near player on movement keys to give visual feedback
+        if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(e.key.toLowerCase())) {
+            this.checkForNearbyDoors();
+        }
+    }
+    
+    // Visual feedback for nearby doors
+    checkForNearbyDoors() {
+        const nearbyDoor = this.findNearbyDoor();
+        if (nearbyDoor && nearbyDoor.doorElement) {
+            // Highlight door
+            nearbyDoor.doorElement.style.boxShadow = '0 0 15px rgba(255, 255, 0, 0.8)';
+            
+            // Reset highlight after a short delay
+            setTimeout(() => {
+                if (nearbyDoor.doorElement.dataset.isOpen !== 'true') {
+                    nearbyDoor.doorElement.style.boxShadow = 'none';
+                }
+            }, 1000);
+        }
     }
 
     handleKeyUp(e) {
@@ -417,22 +470,195 @@ class EscapeRoomGame {
     }
 
     movePlayer(x, y) {
-        // Simple boundary checking for container
-        const gameWorld = document.getElementById('gameWorld');
-        if (!gameWorld) return;
+        // Use fixed game world dimensions and current room bounds
+        const currentRoomData = this.rooms.get(this.currentRoom);
+        if (!currentRoomData) {
+            console.error('Current room not found:', this.currentRoom);
+            return;
+        }
         
-        const bounds = gameWorld.getBoundingClientRect();
-        const minX = 10; // Player radius
-        const minY = 10;
-        const maxX = bounds.width - 10;
-        const maxY = bounds.height - 10;
+        const room = currentRoomData.bounds;
+        let minX = room.x + 10; // Player radius
+        let minY = room.y + 10;
+        let maxX = room.x + room.width - 10;
+        let maxY = room.y + room.height - 10;
+        
+        // Check if player is trying to move through a door
+        let newRoom = null;
+        
+        // Get player position and proposed position
+        const playerPos = {...this.currentPosition};
+        const proposedPos = {x, y};
+        
+        // Check if player is crossing a boundary with an open door
+        for (const targetRoom of currentRoomData.doors) {
+            const doorId = `door-${this.currentRoom}-to-${targetRoom}`;
+            const doorIdReversed = `door-${targetRoom}-to-${this.currentRoom}`;
+            
+            const doorElement = document.getElementById(doorId) || document.getElementById(doorIdReversed);
+            
+            if (doorElement && doorElement.dataset.isOpen === 'true') {
+                // Door is open - check if player is crossing through this door
+                const targetRoomData = this.rooms.get(targetRoom);
+                if (!targetRoomData) continue;
+                
+                const targetBounds = targetRoomData.bounds;
+                
+                // Get door position and dimensions
+                const doorX = parseInt(doorElement.style.left);
+                const doorY = parseInt(doorElement.style.top);
+                const doorWidth = parseInt(doorElement.style.width);
+                const doorHeight = parseInt(doorElement.style.height);
+                
+                // Create door area matching the actual door dimensions
+                const doorMargin = 0; // No extra margin
+                const doorArea = {
+                    left: doorX - doorMargin,
+                    right: doorX + doorWidth + doorMargin,
+                    top: doorY - doorMargin,
+                    bottom: doorY + doorHeight + doorMargin
+                };
+                
+                // Check if player is within the door area
+                const playerInDoorArea = (
+                    proposedPos.x + 10 >= doorArea.left &&
+                    proposedPos.x - 10 <= doorArea.right &&
+                    proposedPos.y + 10 >= doorArea.top &&
+                    proposedPos.y - 10 <= doorArea.bottom
+                );
+                
+                // Check which boundary the door is on
+                let crossingDoor = false;
+                
+                // Determine if player is at a room boundary AND within the door area
+                if (playerInDoorArea) {
+                    console.log('🚪 Player in door area, checking if crossing boundary');
+                    
+                    // Force check door status again
+                    const isDoorOpen = doorElement.dataset.isOpen === 'true';
+                    console.log('🚪 Door is open according to dataset:', isDoorOpen);
+                    
+                    if (!isDoorOpen) {
+                        // Fix any visual inconsistency
+                        console.log('⚠️ Door in crossing area appears closed - fixing any visual inconsistency');
+                        const isHorizontal = doorWidth > doorHeight;
+                        const hasOpenTransform = doorElement.style.transform && 
+                                              (doorElement.style.transform.includes('-30deg') || 
+                                               doorElement.style.transform.includes('30deg'));
+                                               
+                        if (hasOpenTransform) {
+                            console.log('⚠️ Door visually appears open but dataset says closed - fixing...');
+                            doorElement.dataset.isOpen = 'true';
+                        }
+                    }
+                    
+                    // Increase tolerance for boundary crossing
+                    const tolerance = 15;  // Increased from 10 to make crossing easier
+                    
+                    // Right wall door
+                    if (Math.abs(proposedPos.x - maxX) < tolerance && targetBounds.x > room.x) {
+                        if (isDoorOpen) crossingDoor = true;
+                    }
+                    // Left wall door
+                    else if (Math.abs(proposedPos.x - minX) < tolerance && targetBounds.x < room.x) {
+                        if (isDoorOpen) crossingDoor = true;
+                    }
+                    // Bottom wall door
+                    else if (Math.abs(proposedPos.y - maxY) < tolerance && targetBounds.y > room.y) {
+                        if (isDoorOpen) crossingDoor = true;
+                    }
+                    // Top wall door
+                    else if (Math.abs(proposedPos.y - minY) < tolerance && targetBounds.y < room.y) {
+                        if (isDoorOpen) crossingDoor = true;
+                    }
+                }
+                
+                if (crossingDoor) {
+                    // Double check that the door is actually open
+                    if (doorElement.dataset.isOpen !== 'true') {
+                        console.log('⚠️ Door appears to be closed but trying to cross!');
+                        console.log('⚠️ Forcing door open to fix state inconsistency');
+                        
+                        // Fix the inconsistent door state
+                        doorElement.dataset.isOpen = 'true';
+                        const isHorizontal = doorWidth > doorHeight;
+                        const rotation = isHorizontal ? 'rotate(-30deg)' : 'rotate(30deg)';
+                        doorElement.style.transform = rotation;
+                        doorElement.style.backgroundColor = '#A0522D';
+                        doorElement.style.boxShadow = '0 0 10px rgba(255, 255, 0, 0.5)';
+                    }
+                    
+                    newRoom = targetRoom;
+                    console.log('🚪 Detected player crossing through door to room:', targetRoom);
+                    console.log('🚪 Door position:', {x: doorX, y: doorY, width: doorWidth, height: doorHeight});
+                    console.log('🚪 Player position:', proposedPos);
+                    console.log('🚪 Door area:', doorArea);
+                    console.log('🚪 Door is open:', doorElement.dataset.isOpen === 'true');
+                } else if (playerInDoorArea) {
+                    console.log('🚪 Player in door area but not crossing boundary:', {
+                        playerPos: proposedPos,
+                        boundaries: {minX, minY, maxX, maxY},
+                        doorIsOpen: doorElement.dataset.isOpen === 'true'
+                    });
+                    break;
+                }
+            }
+        }
+        
+        // If player is moving to a new room, allow them to move beyond the current room bounds
+        if (newRoom) {
+            const oldRoom = this.currentRoom;
+            // Change room
+            this.currentRoom = newRoom;
+            
+            // Re-render everything for the new room
+            this.renderRoomBoundaries();
+            this.renderDoors();
+            
+            // Get new room bounds for position constraint
+            const newRoomData = this.rooms.get(newRoom);
+            if (newRoomData) {
+                const newRoomBounds = newRoomData.bounds;
+                minX = newRoomBounds.x + 10;
+                minY = newRoomBounds.y + 10;
+                maxX = newRoomBounds.x + newRoomBounds.width - 10;
+                maxY = newRoomBounds.y + newRoomBounds.height - 10;
+                
+                // Move player a bit further into the new room to avoid getting stuck
+                const oldRoomData = this.rooms.get(oldRoom);
+                if (oldRoomData) {
+                    const oldBounds = oldRoomData.bounds;
+                    const newBounds = newRoomData.bounds;
+                    const offset = 25; // Move 25px further into the new room
+                    
+                    // Determine direction of movement and adjust position
+                    if (newBounds.x > oldBounds.x) {
+                        // Moving right
+                        x += offset;
+                    } else if (newBounds.x < oldBounds.x) {
+                        // Moving left
+                        x -= offset;
+                    } else if (newBounds.y > oldBounds.y) {
+                        // Moving down
+                        y += offset;
+                    } else if (newBounds.y < oldBounds.y) {
+                        // Moving up
+                        y -= offset;
+                    }
+                }
+                
+                console.log('🚪 Player walked through door to room:', newRoom, 'from room:', oldRoom);
+                console.log(`🚪 Moved player to position ${x}, ${y} in new room`);
+                console.log('🚪 New room bounds:', newRoomBounds);
+            }
+        }
         
         const newPosition = {
             x: Math.max(minX, Math.min(maxX, x)),
             y: Math.max(minY, Math.min(maxY, y))
         };
         
-        // No collision detection for now - just move
+        // Update position
         this.currentPosition = newPosition;
         
         // Update the player HTML element position immediately
@@ -444,6 +670,8 @@ class EscapeRoomGame {
                 position: this.currentPosition
             });
         }
+        
+        console.log(`🎮 Player moved to ${newPosition.x}, ${newPosition.y} in room ${this.currentRoom}`);
     }
 
     updatePlayerPosition() {
@@ -473,6 +701,38 @@ class EscapeRoomGame {
     }
 
     handleInteraction() {
+        // Debounce mechanism to prevent rapid repeated interactions
+        const now = Date.now();
+        if (now - this.lastInteractionTime < this.interactionCooldown) {
+            return; // Too soon since last interaction, ignore
+        }
+        this.lastInteractionTime = now;
+        
+        // Check for nearby doors first (E key functionality)
+        const nearbyDoor = this.findNearbyDoor();
+        if (nearbyDoor) {
+            // Use door element if provided, otherwise find it
+            let doorElement = nearbyDoor.doorElement;
+            
+            if (!doorElement) {
+                // Find the door element based on current room and target room
+                const doorId = `door-${this.currentRoom}-to-${nearbyDoor.targetRoom}`;
+                const doorIdReversed = `door-${nearbyDoor.targetRoom}-to-${this.currentRoom}`;
+                doorElement = document.getElementById(doorId) || document.getElementById(doorIdReversed);
+            }
+            
+            if (doorElement) {
+                console.log('🚪 Found door element, simulating click');
+                
+                // Simulate a click event to ensure identical behavior
+                doorElement.click();
+                return;
+            } else {
+                console.error('🚪 Could not find door element for door to room:', nearbyDoor.targetRoom);
+            }
+        }
+        
+        // If no doors nearby, check for other interactable objects
         if (!this.gameStarted) return;
         
         // Find nearby interactable objects
@@ -482,7 +742,10 @@ class EscapeRoomGame {
         
         for (const [objectId, gameObject] of this.gameObjects) {
             if (gameObject.interactable) {
-                const distance = this.getDistance(this.currentPosition, gameObject);
+                const distance = this.getDistance(this.currentPosition, {
+                    x: gameObject.x + gameObject.width / 2,
+                    y: gameObject.y + gameObject.height / 2
+                });
                 if (distance < interactionRange && distance < nearestDistance) {
                     nearestObject = gameObject;
                     nearestDistance = distance;
@@ -495,41 +758,94 @@ class EscapeRoomGame {
                 objectId: nearestObject.id,
                 interactionType: 'use'
             });
+        } else {
+            console.log('🚫 Nothing to interact with nearby');
+            this.showNotification('Nothing to interact with nearby', 'info');
         }
     }
-
-    handleInteraction(gameObject = null) {
-        if (!this.gameStarted) return;
+    
+    findNearbyDoor() {
+        const interactionRange = 100; // Increased range for doors to make keyboard interaction easier
+        const currentRoomData = this.rooms.get(this.currentRoom);
+        if (!currentRoomData) return null;
         
-        // If no game object provided, find nearby interactable objects
-        if (!gameObject) {
-            const nearbyObjects = this.findNearbyInteractables();
-            if (nearbyObjects.length === 0) {
-                this.showNotification('Nothing to interact with nearby', 'info');
-                return;
+        console.log(`🔍 Looking for door near player at (${this.currentPosition.x}, ${this.currentPosition.y}) in room ${this.currentRoom}`);
+        
+        // Check each door in the current room
+        let closestDoor = null;
+        let closestDistance = Infinity;
+        
+        for (const targetRoom of currentRoomData.doors) {
+            const targetRoomData = this.rooms.get(targetRoom);
+            if (!targetRoomData) continue;
+            
+            // Check if door element exists already
+            const doorId = `door-${this.currentRoom}-to-${targetRoom}`;
+            const doorIdReversed = `door-${targetRoom}-to-${this.currentRoom}`;
+            const doorElement = document.getElementById(doorId) || document.getElementById(doorIdReversed);
+            
+            // Get door position - either from DOM element or calculate if not found
+            let doorX, doorY, doorWidth, doorHeight;
+            
+            if (doorElement) {
+                // Use the actual DOM element position
+                doorX = parseInt(doorElement.style.left);
+                doorY = parseInt(doorElement.style.top);
+                doorWidth = parseInt(doorElement.style.width);
+                doorHeight = parseInt(doorElement.style.height);
+            } else {
+                // Calculate door position using room bounds (same logic as renderDoors)
+                const room = currentRoomData.bounds;
+                const targetBounds = targetRoomData.bounds;
+                
+                if (targetBounds.x < room.x) {
+                    // Door on left wall
+                    doorX = room.x;
+                    doorY = room.y + room.height / 2 - 30;
+                    doorWidth = 10;
+                    doorHeight = 60;
+                } else if (targetBounds.x > room.x) {
+                    // Door on right wall
+                    doorX = room.x + room.width - 10;
+                    doorY = room.y + room.height / 2 - 30;
+                    doorWidth = 10;
+                    doorHeight = 60;
+                } else if (targetBounds.y < room.y) {
+                    // Door on top wall
+                    doorX = room.x + room.width / 2 - 30;
+                    doorY = room.y;
+                    doorWidth = 60;
+                    doorHeight = 10;
+                } else {
+                    // Door on bottom wall
+                    doorX = room.x + room.width / 2 - 30;
+                    doorY = room.y + room.height - 10;
+                    doorWidth = 60;
+                    doorHeight = 10;
+                }
             }
-            gameObject = nearbyObjects[0];
+            
+            // Check if player is close to this door
+            const doorCenterX = doorX + doorWidth / 2;
+            const doorCenterY = doorY + doorHeight / 2;
+            const distance = this.getDistance(this.currentPosition, { x: doorCenterX, y: doorCenterY });
+            
+            // Keep track of the closest door within range
+            if (distance < interactionRange && distance < closestDistance) {
+                closestDistance = distance;
+                closestDoor = { 
+                    targetRoom, 
+                    doorX, 
+                    doorY, 
+                    doorWidth, 
+                    doorHeight,
+                    isHorizontal: doorWidth > doorHeight,
+                    doorElement: doorElement // Store the DOM element if found
+                };
+            }
         }
         
-        // Check if player is close enough to interact
-        const distance = this.getDistance(this.currentPosition, {
-            x: gameObject.x + gameObject.width / 2,
-            y: gameObject.y + gameObject.height / 2
-        });
-        
-        if (distance > 50) {
-            this.showNotification('Too far away to interact', 'warning');
-            return;
-        }
-        
-        // Send interaction message to server
-        this.sendMessage('player_interact', {
-            objectId: gameObject.id,
-            interactionType: 'click'
-        });
-        
-        // Show interaction feedback
-        this.showNotification(`Interacting with ${gameObject.name || gameObject.type}`, 'info');
+        return closestDoor;
     }
 
     getDistance(pos1, pos2) {
@@ -860,6 +1176,39 @@ class EscapeRoomGame {
         this.addChatMessage(data.playerName, data.message, data.timestamp);
     }
 
+    handleDoorStateChange(data) {
+        console.log('🚪 Received door state change from server:', data);
+        
+        // Find the door element
+        const doorElement = document.getElementById(data.doorId);
+        if (doorElement) {
+            // Update door visual state to match what was sent from server
+            doorElement.dataset.isOpen = data.isOpen ? 'true' : 'false';
+            
+            // Get door dimensions for proper rotation
+            const doorWidth = parseInt(doorElement.style.width) || 0;
+            const doorHeight = parseInt(doorElement.style.height) || 0;
+            const isHorizontal = doorWidth > doorHeight;
+            
+            if (data.isOpen) {
+                // Door is open
+                const rotation = isHorizontal ? 'rotate(-30deg)' : 'rotate(30deg)';
+                doorElement.style.transform = rotation;
+                doorElement.style.backgroundColor = '#A0522D';
+                doorElement.style.boxShadow = '0 0 10px rgba(255, 255, 0, 0.5)';
+            } else {
+                // Door is closed
+                doorElement.style.transform = 'none';
+                doorElement.style.backgroundColor = '#8B4513';
+                doorElement.style.boxShadow = 'none';
+            }
+            
+            console.log(`🚪 Updated door ${data.doorId} to ${data.isOpen ? 'OPEN' : 'CLOSED'} state`);
+        } else {
+            console.error('🚪 Could not find door element:', data.doorId);
+        }
+    }
+
     // UI Management
     showShareLink() {
         if (this.selectedIP && this.roomCode) {
@@ -898,6 +1247,9 @@ class EscapeRoomGame {
             console.error(`🔍 DEBUG: Game screen not found!`);
         }
         
+        // Setup game world scaling
+        this.setupGameWorldScaling();
+        
         // Initialize canvas if not already done
         if (!this.canvas) {
             console.log(`🔍 DEBUG: Initializing canvas`);
@@ -923,20 +1275,290 @@ class EscapeRoomGame {
         this.setupGameEventListeners();
     }
 
+    setupGameWorldScaling() {
+        console.log('🎮 Setting up game world scaling');
+        
+        const gameWorld = document.getElementById('gameWorld');
+        if (!gameWorld) {
+            console.error('Game world container not found');
+            return;
+        }
+        
+        // Set the game world to fixed dimensions
+        gameWorld.style.width = this.GAME_WORLD_WIDTH + 'px';
+        gameWorld.style.height = this.GAME_WORLD_HEIGHT + 'px';
+        gameWorld.style.position = 'relative';
+        gameWorld.style.overflow = 'hidden';
+        
+        // Make sure game world is properly sized
+        console.log(`🎮 Game world set to ${this.GAME_WORLD_WIDTH}x${this.GAME_WORLD_HEIGHT}`);
+    }
+
     initializeGameObjects() {
         console.log('🔍 DEBUG: initializeGameObjects called');
         
-        // Initialize any game objects, obstacles, items, etc.
-        // This is where you would set up the game world
+        // Clear existing objects
+        this.gameObjects.clear();
         
-        // For now, this is a placeholder method
-        // You can expand this later to add:
-        // - Game objects (doors, keys, puzzles, etc.)
-        // - Interactive elements
-        // - Obstacles
-        // - Items
+        // Render room boundaries and doors
+        this.renderRoomBoundaries();
+        this.renderDoors();
         
-        console.log('🎮 Game objects initialized');
+        console.log('🎮 Game objects initialized for room:', this.currentRoom);
+    }
+    
+    renderRoomBoundaries() {
+        const gameWorld = document.getElementById('gameWorld');
+        if (!gameWorld) return;
+        
+        // Remove existing room elements
+        const existingRooms = gameWorld.querySelectorAll('.room-boundary');
+        existingRooms.forEach(room => room.remove());
+        
+        // Render all rooms with different colors
+        const roomColors = {
+            'NW': 'rgba(255, 0, 0, 0.1)',   // Red tint for start room
+            'SW': 'rgba(0, 255, 0, 0.1)',   // Green tint
+            'SE': 'rgba(0, 0, 255, 0.1)',   // Blue tint
+            'NE': 'rgba(255, 255, 0, 0.1)'  // Yellow tint for end room
+        };
+        
+        for (const [roomId, roomData] of this.rooms) {
+            const roomElement = document.createElement('div');
+            roomElement.className = 'room-boundary';
+            roomElement.id = `room-${roomId}`;
+            roomElement.style.position = 'absolute';
+            roomElement.style.left = roomData.bounds.x + 'px';
+            roomElement.style.top = roomData.bounds.y + 'px';
+            roomElement.style.width = roomData.bounds.width + 'px';
+            roomElement.style.height = roomData.bounds.height + 'px';
+            roomElement.style.backgroundColor = roomColors[roomId] || 'rgba(128, 128, 128, 0.1)';
+            roomElement.style.border = '1px solid #666'; // Same border for all rooms
+            roomElement.style.boxSizing = 'border-box';
+            roomElement.style.zIndex = '1';
+            
+            // Add room label
+            const label = document.createElement('div');
+            label.textContent = roomData.name;
+            label.style.position = 'absolute';
+            label.style.top = '10px';
+            label.style.left = '10px';
+            label.style.color = '#fff';
+            label.style.fontSize = '12px';
+            label.style.fontWeight = 'bold';
+            label.style.background = 'rgba(0,0,0,0.7)';
+            label.style.padding = '2px 6px';
+            label.style.borderRadius = '3px';
+            
+            roomElement.appendChild(label);
+            gameWorld.appendChild(roomElement);
+        }
+    }
+    
+    renderDoors() {
+        const gameWorld = document.getElementById('gameWorld');
+        if (!gameWorld) return;
+        
+        // Remove existing doors
+        const existingDoors = gameWorld.querySelectorAll('.door');
+        existingDoors.forEach(door => door.remove());
+        
+        // Track processed door pairs to avoid duplicates
+        const processedConnections = new Set();
+        
+        // Add doors for ALL rooms, but avoid duplicates
+        for (const [roomId, roomData] of this.rooms) {
+            const room = roomData.bounds;
+            
+            // Add doors to connected rooms
+            roomData.doors.forEach(targetRoom => {
+                // Create a unique key for this connection (sorted to avoid duplicates)
+                const connectionKey = [roomId, targetRoom].sort().join('-');
+                if (processedConnections.has(connectionKey)) {
+                    return; // Skip if we already processed this connection
+                }
+                processedConnections.add(connectionKey);
+                
+                const targetRoomData = this.rooms.get(targetRoom);
+                if (!targetRoomData) return;
+                
+                const targetBounds = targetRoomData.bounds;
+                
+                // Determine door position based on relative room positions
+                let doorX, doorY, doorWidth, doorHeight;
+                
+                if (targetBounds.x < room.x) {
+                    // Door on left wall - center it vertically
+                    doorX = room.x; // Exactly at the boundary
+                    doorY = room.y + (room.height / 2) - 30; // Center vertically
+                    doorWidth = 10;
+                    doorHeight = 60;
+                } else if (targetBounds.x > room.x) {
+                    // Door on right wall - center it vertically  
+                    doorX = room.x + room.width - 10; // Exactly at the boundary
+                    doorY = room.y + (room.height / 2) - 30; // Center vertically
+                    doorWidth = 10;
+                    doorHeight = 60;
+                } else if (targetBounds.y < room.y) {
+                    // Door on top wall - center it horizontally
+                    doorX = room.x + (room.width / 2) - 30; // Center horizontally
+                    doorY = room.y; // Exactly at the boundary
+                    doorWidth = 60;
+                    doorHeight = 10;
+                } else {
+                    // Door on bottom wall - center it horizontally
+                    doorX = room.x + (room.width / 2) - 30; // Center horizontally
+                    doorY = room.y + room.height - 10; // Exactly at the boundary
+                    doorWidth = 60;
+                    doorHeight = 10;
+                }
+                
+                const doorElement = document.createElement('div');
+                doorElement.className = 'door';
+                doorElement.id = `door-${roomId}-to-${targetRoom}`;
+                doorElement.style.position = 'absolute';
+                doorElement.style.left = doorX + 'px';
+                doorElement.style.top = doorY + 'px';
+                doorElement.style.width = doorWidth + 'px';
+                doorElement.style.height = doorHeight + 'px';
+                doorElement.style.backgroundColor = '#8B4513';
+                doorElement.style.border = '2px solid #654321';
+                doorElement.style.cursor = 'pointer';
+                doorElement.style.zIndex = '10';
+                doorElement.style.transition = 'transform 0.3s ease-in-out';
+                doorElement.style.transformOrigin = doorWidth > doorHeight ? 'left center' : 'center top'; // Axis for rotation
+                
+                // Store door state
+                doorElement.dataset.isOpen = 'false';
+                doorElement.dataset.targetRoom = targetRoom;
+                doorElement.dataset.fromRoom = roomId;
+                
+                // Add click handler for room transitions
+                doorElement.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    // Allow transition from either connected room
+                    if (this.currentRoom === roomId || this.currentRoom === targetRoom) {
+                        this.openDoor(doorElement);
+                        
+                        // Add helper text to guide the user
+                        if (doorElement.dataset.isOpen === 'true') {
+                            this.showNotification('Door opened! Walk through to enter the next room.', 'success');
+                        }
+                    }
+                });
+                
+                // Add hover effect
+                doorElement.addEventListener('mouseenter', () => {
+                    if (this.currentRoom === roomId || this.currentRoom === targetRoom) {
+                        if (doorElement.dataset.isOpen !== 'true') {
+                            doorElement.style.backgroundColor = '#A0522D';
+                        }
+                        
+                        const isOpen = doorElement.dataset.isOpen === 'true';
+                        const newRoom = this.currentRoom === roomId ? targetRoom : roomId;
+                        const newRoomData = this.rooms.get(newRoom);
+                        
+                        if (isOpen) {
+                            doorElement.title = `Walk through to ${newRoomData.name}`;
+                            doorElement.style.cursor = 'pointer';
+                            doorElement.style.outline = '2px dashed yellow';
+                        } else {
+                            doorElement.title = `Click to open door to ${newRoomData.name}`;
+                        }
+                    }
+                });
+                
+                doorElement.addEventListener('mouseleave', () => {
+                    if (doorElement.dataset.isOpen !== 'true') {
+                        doorElement.style.backgroundColor = '#8B4513';
+                    }
+                    doorElement.style.outline = 'none';
+                });
+                
+                gameWorld.appendChild(doorElement);
+            });
+        }
+    }
+    
+    openDoor(doorElement) {
+        if (!doorElement || !doorElement.dataset) {
+            console.error('🚪 Invalid door element passed to openDoor:', doorElement);
+            return;
+        }
+        
+        // Get door properties from dataset
+        const isOpen = doorElement.dataset.isOpen === 'true';
+        const targetRoom = doorElement.dataset.targetRoom;
+        const fromRoom = doorElement.dataset.fromRoom;
+        
+        // Toggle door state - store as string 'true' or 'false' for dataset compatibility
+        const newState = !isOpen;
+        doorElement.dataset.isOpen = newState ? 'true' : 'false';
+        
+        // Get door dimensions to determine orientation (horizontal/vertical)
+        const doorWidth = parseInt(doorElement.style.width) || 0;
+        const doorHeight = parseInt(doorElement.style.height) || 0;
+        const isHorizontal = doorWidth > doorHeight;
+        
+        // Force browser to reflow to ensure style changes are applied
+        void doorElement.offsetWidth;
+        
+        // Apply rotation based on door orientation
+        if (!newState) {
+            // Door is closed
+            doorElement.style.transform = 'none';
+            doorElement.style.backgroundColor = '#8B4513'; // Reset to original color
+            doorElement.style.boxShadow = 'none';
+            
+            // Remove any open indicators
+            let openIndicator = doorElement.querySelector('.door-open-indicator');
+            if (openIndicator) {
+                openIndicator.remove();
+            }
+        } else {
+            // Door is open - rotate 30 degrees
+            const rotation = isHorizontal ? 'rotate(-30deg)' : 'rotate(30deg)';
+            doorElement.style.transform = rotation;
+            doorElement.style.backgroundColor = '#A0522D'; // Slightly lighter when open
+            doorElement.style.boxShadow = '0 0 10px rgba(255, 255, 0, 0.5)'; // Yellow glow for open doors
+            
+            // Force reflow again to ensure transform is applied
+            void doorElement.offsetWidth;
+        }
+        
+        // Log the change more clearly
+        console.log(`🚪 Door toggled from ${isOpen ? 'OPEN→CLOSED' : 'CLOSED→OPEN'} between ${fromRoom || 'unknown'} and ${targetRoom || 'unknown'}`);
+        console.log(`🚪 Door is now ${newState ? 'OPEN' : 'CLOSED'} (dataset value: ${doorElement.dataset.isOpen})`);
+        
+        // Send door state change to server so other players can see it
+        if (this.isConnectedToServer()) {
+            this.sendMessage('door_state_change', {
+                doorId: doorElement.id,
+                isOpen: newState,
+                fromRoom: fromRoom || 'unknown',
+                targetRoom: targetRoom || 'unknown'
+            });
+        }
+    }
+    
+    changeRoom(newRoom) {
+        console.log('🚪 Changing room from', this.currentRoom, 'to', newRoom);
+        
+        this.currentRoom = newRoom;
+        
+        // Reset player position to center of new room
+        const room = this.rooms.get(newRoom);
+        if (room) {
+            this.currentPosition.x = room.bounds.x + room.bounds.width / 2;
+            this.currentPosition.y = room.bounds.y + room.bounds.height / 2;
+        }
+        
+        // Re-render everything for the new room
+        this.renderRoomBoundaries();
+        this.renderDoors();
+        this.renderPlayers();
+        
+        console.log('🚪 Now in room:', newRoom, 'at position:', this.currentPosition);
     }
 
     setupGameEventListeners() {
@@ -975,13 +1597,18 @@ class EscapeRoomGame {
         console.log('🔍 DEBUG: handleGameClick called', e);
         
         // Handle game world clicks for click-to-move
-        const rect = e.target.getBoundingClientRect();
+        const gameWorld = document.getElementById('gameWorld');
+        if (!gameWorld) return;
+        
+        const rect = gameWorld.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
         const clickY = e.clientY - rect.top;
         
         console.log('🎮 Game click at:', clickX, clickY);
+        console.log('🎮 Current room:', this.currentRoom);
+        console.log('🎮 Player position:', this.currentPosition);
         
-        // Set destination for progressive movement instead of teleporting
+        // Always allow clicks - the movement system will handle room boundaries
         this.destination = { x: clickX, y: clickY };
         console.log('🎯 Destination set to:', this.destination);
     }
@@ -1011,13 +1638,18 @@ class EscapeRoomGame {
         // Only treat as tap if touch was brief and didn't move much
         if (!this.touchMoved && touchDuration < 500) {
             const touch = e.changedTouches[0];
-            const rect = e.target.getBoundingClientRect();
+            const gameWorld = document.getElementById('gameWorld');
+            if (!gameWorld) return;
+            
+            const rect = gameWorld.getBoundingClientRect();
             const touchX = touch.clientX - rect.left;
             const touchY = touch.clientY - rect.top;
             
             console.log('🎮 Touch tap at:', touchX, touchY);
+            console.log('🎮 Current room:', this.currentRoom);
+            console.log('🎮 Player position:', this.currentPosition);
             
-            // Set destination for progressive movement instead of teleporting
+            // Always allow taps - the movement system will handle room boundaries
             this.destination = { x: touchX, y: touchY };
             console.log('🎯 Touch destination set to:', this.destination);
         }
@@ -1479,23 +2111,31 @@ class EscapeRoomGame {
     }
 
     // UI and Notification Methods
-    showNotification(message, type = 'info') {
+    showNotification(message, type = 'info', duration = 3000) {
         console.log(`🔔 ${type.toUpperCase()}: ${message}`);
+        
+        // Prevent duplicate notifications
+        const notificationId = `${type}-${message.replace(/\s+/g, '-')}`;
+        if (document.querySelector(`[data-notification-id="${notificationId}"]`)) {
+            console.log('🔔 Duplicate notification skipped:', message);
+            return;
+        }
         
         // Create notification element
         const notification = document.createElement('div');
         notification.className = `notification notification-${type}`;
         notification.textContent = message;
+        notification.dataset.notificationId = notificationId;
         
         // Add to page
         document.body.appendChild(notification);
         
-        // Auto-remove after 3 seconds
+        // Auto-remove after specified duration
         setTimeout(() => {
             if (notification.parentNode) {
                 notification.parentNode.removeChild(notification);
             }
-        }, 3000);
+        }, duration);
         
         // Also show in any existing notification areas
         const notificationArea = document.getElementById('notifications');
@@ -1687,6 +2327,35 @@ class EscapeRoomGame {
             clearInterval(this.roomListUpdateInterval);
             this.roomListUpdateInterval = null;
         }
+    }
+
+    // Define 2x2 grid of rooms based on game world size
+    setupRooms() {
+        const w = this.GAME_WORLD_WIDTH / 2;  // 400px each
+        const h = this.GAME_WORLD_HEIGHT / 2; // 268px each
+        
+        this.rooms.set('NW', { 
+            name: 'Northwest Room (Start)',
+            bounds: { x: 0, y: 0, width: w, height: h },
+            doors: ['SW'] // Only door to SW (start room)
+        });
+        this.rooms.set('SW', { 
+            name: 'Southwest Room',
+            bounds: { x: 0, y: h, width: w, height: h },
+            doors: ['NW', 'SE'] // Doors back to NW and forward to SE
+        });
+        this.rooms.set('SE', { 
+            name: 'Southeast Room',
+            bounds: { x: w, y: h, width: w, height: h },
+            doors: ['SW', 'NE'] // Doors back to SW and forward to NE
+        });
+        this.rooms.set('NE', { 
+            name: 'Northeast Room (End)',
+            bounds: { x: w, y: 0, width: w, height: h },
+            doors: ['SE'] // Only door back to SE (end room)
+        });
+        
+        console.log('🏠 Rooms setup complete:', this.rooms);
     }
 }
 
