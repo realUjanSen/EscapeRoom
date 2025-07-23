@@ -1506,6 +1506,9 @@ class EscapeRoomGame {
         // Add computers to all rooms
         this.renderComputers();
         
+        // Add decorative items to all rooms
+        this.renderDecorations();
+        
         // Add master door if in NE room
         this.renderMasterDoor();
         
@@ -1847,6 +1850,101 @@ class EscapeRoomGame {
         }
     }
     
+    renderDecorations() {
+        const gameWorld = document.getElementById('gameWorld');
+        if (!gameWorld) return;
+        
+        // Remove existing decorations
+        const existingDecorations = gameWorld.querySelectorAll('.decoration');
+        existingDecorations.forEach(decoration => decoration.remove());
+        
+        // Add decorations to each room
+        for (const [roomId, roomData] of this.rooms) {
+            const room = roomData.bounds;
+            
+            // Define decoration positions for each room (away from doors and computers)
+            let decorationPositions = [];
+            
+            switch (roomId) {
+                case 'NW': // Top-left room (computer at right side)
+                    decorationPositions = [
+                        { type: 'sofa', x: room.x + 30, y: room.y + 120 },   // Left side, mid
+                        { type: 'sofa', x: room.x + 200, y: room.y + 200 },  // Center-bottom
+                        { type: 'plant', x: room.x + 50, y: room.y + 30 },   // Top-left corner
+                        { type: 'plant', x: room.x + 300, y: room.y + 180 }  // Bottom-right (away from computer)
+                    ];
+                    break;
+                case 'SW': // Bottom-left room (computer at left side)
+                    decorationPositions = [
+                        { type: 'sofa', x: room.x + 200, y: room.y + 30 },   // Right side, top
+                        { type: 'sofa', x: room.x + 280, y: room.y + 160 },  // Right side, bottom
+                        { type: 'plant', x: room.x + 120, y: room.y + 100 }, // Center
+                        { type: 'plant', x: room.x + 320, y: room.y + 200 }  // Bottom-right corner
+                    ];
+                    break;
+                case 'SE': // Bottom-right room (computer at left side, bottom)
+                    decorationPositions = [
+                        { type: 'sofa', x: room.x + 200, y: room.y + 30 },   // Right side, top
+                        { type: 'sofa', x: room.x + 300, y: room.y + 120 },  // Right side, mid
+                        { type: 'plant', x: room.x + 80, y: room.y + 60 },   // Left side, top
+                        { type: 'plant', x: room.x + 150, y: room.y + 180 }  // Center, bottom (away from computer)
+                    ];
+                    break;
+                case 'NE': // Top-right room (computer at center, master door at top)
+                    decorationPositions = [
+                        { type: 'sofa', x: room.x + 50, y: room.y + 150 },   // Left side, bottom
+                        { type: 'sofa', x: room.x + 280, y: room.y + 180 },  // Right side, bottom
+                        { type: 'plant', x: room.x + 60, y: room.y + 60 },   // Left side, top
+                        { type: 'plant', x: room.x + 300, y: room.y + 120 }  // Right side, mid
+                    ];
+                    break;
+            }
+            
+            // Create decoration elements
+            decorationPositions.forEach((decoration, index) => {
+                const decorationElement = document.createElement('div');
+                decorationElement.className = `decoration ${decoration.type}`;
+                decorationElement.id = `${decoration.type}-${roomId}-${index}`;
+                decorationElement.style.position = 'absolute';
+                decorationElement.style.left = decoration.x + 'px';
+                decorationElement.style.top = decoration.y + 'px';
+                decorationElement.style.zIndex = '5'; // Behind interactive objects
+                decorationElement.style.pointerEvents = 'none'; // Non-interactive
+                
+                // Set size based on decoration type
+                if (decoration.type === 'sofa') {
+                    decorationElement.style.width = '60px';
+                    decorationElement.style.height = '60px';
+                    decorationElement.style.backgroundImage = 'url("assets/images/sofa light.png")';
+                } else if (decoration.type === 'plant') {
+                    decorationElement.style.width = '40px';
+                    decorationElement.style.height = '50px';
+                    decorationElement.style.backgroundImage = 'url("assets/images/plant.webp")';
+                }
+                
+                // Common styling for all decorations
+                decorationElement.style.backgroundSize = 'contain';
+                decorationElement.style.backgroundRepeat = 'no-repeat';
+                decorationElement.style.backgroundPosition = 'center';
+                decorationElement.style.opacity = '0.8';
+                decorationElement.style.transition = 'opacity 0.3s ease';
+                
+                // Add subtle hover effect for visual feedback
+                decorationElement.addEventListener('mouseenter', () => {
+                    decorationElement.style.opacity = '1';
+                });
+                
+                decorationElement.addEventListener('mouseleave', () => {
+                    decorationElement.style.opacity = '0.8';
+                });
+                
+                gameWorld.appendChild(decorationElement);
+            });
+            
+            console.log(`🎨 Added ${decorationPositions.length} decorations to ${roomData.name}`);
+        }
+    }
+    
     renderMasterDoor() {
         const gameWorld = document.getElementById('gameWorld');
         if (!gameWorld) return;
@@ -2064,6 +2162,7 @@ class EscapeRoomGame {
         this.renderRoomBoundaries();
         this.renderDoors();
         this.renderComputers(); // Add computers to new room
+        this.renderDecorations(); // Add decorations to new room
         this.renderMasterDoor(); // Add master door if applicable
         this.renderPlayers();
         
