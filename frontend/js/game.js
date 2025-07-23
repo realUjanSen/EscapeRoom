@@ -37,6 +37,11 @@ class EscapeRoomGame {
         this.lastInteractionTime = 0;
         this.interactionCooldown = 300; // 300ms cooldown between interactions
         
+        // Cybersecurity puzzle system
+        this.computerPuzzles = new Map();
+        this.solvedPuzzles = new Set();
+        this.initializePuzzles();
+        
         // Game world dimensions (fixed size that scales to fit screen)
         this.GAME_WORLD_WIDTH = 800;
         this.GAME_WORLD_HEIGHT = 536;
@@ -75,6 +80,9 @@ class EscapeRoomGame {
         
         // Mobile touch controls
         this.setupMobileControls();
+        
+        // Puzzle system event listeners
+        this.setupPuzzleEventListeners();
     }
 
     setupMobileControls() {
@@ -732,21 +740,30 @@ class EscapeRoomGame {
             }
         }
         
-        // If no doors nearby, check for other interactable objects
+        // If no doors nearby, check for computers and other interactable objects
+        const nearbyComputer = this.findNearbyComputer();
+        if (nearbyComputer) {
+            this.openComputerPuzzle(nearbyComputer.roomId);
+            return;
+        }
+        
+        // Check for other game objects if we add them later
         if (!this.gameStarted) return;
         
-        // Find nearby interactable objects
+        // Find nearby interactable objects (general fallback)
         const interactionRange = 50;
         let nearestObject = null;
         let nearestDistance = Infinity;
         
         for (const [objectId, gameObject] of this.gameObjects) {
-            if (gameObject.interactable) {
+            if (gameObject.interactable && gameObject.type !== 'computer') { // Skip computers, handled above
                 const distance = this.getDistance(this.currentPosition, {
                     x: gameObject.x + gameObject.width / 2,
                     y: gameObject.y + gameObject.height / 2
                 });
-                if (distance < interactionRange && distance < nearestDistance) {
+                const maxDistance = gameObject.proximity || interactionRange;
+                
+                if (distance < maxDistance && distance < nearestDistance) {
                     nearestObject = gameObject;
                     nearestDistance = distance;
                 }
@@ -852,6 +869,161 @@ class EscapeRoomGame {
         const dx = pos1.x - pos2.x;
         const dy = pos1.y - pos2.y;
         return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    findNearbyComputer() {
+        const interactionRange = 30; // 30 pixels for computers
+        
+        // Check computers in current room only
+        const computerObject = this.gameObjects.get(`computer-${this.currentRoom}`);
+        if (computerObject && computerObject.interactable) {
+            const distance = this.getDistance(this.currentPosition, {
+                x: computerObject.x + computerObject.width / 2,
+                y: computerObject.y + computerObject.height / 2
+            });
+            
+            if (distance <= interactionRange) {
+                return computerObject;
+            }
+        }
+        
+        return null;
+    }
+
+    openComputerPuzzle(roomId) {
+        const puzzle = this.computerPuzzles.get(roomId);
+        if (!puzzle) {
+            console.error('No puzzle found for room:', roomId);
+            return;
+        }
+
+        // Check if already solved
+        if (this.solvedPuzzles.has(roomId)) {
+            this.showNotification('This computer has already been accessed', 'info');
+            return;
+        }
+
+        // Populate puzzle overlay
+        document.getElementById('puzzleTitle').textContent = puzzle.title;
+        document.getElementById('puzzleSubtitle').textContent = puzzle.subtitle;
+        document.getElementById('puzzleRiddle').textContent = puzzle.riddle;
+        document.getElementById('puzzleInput').value = '';
+        
+        // Hide all feedback elements
+        document.getElementById('puzzleHint').classList.remove('show');
+        document.getElementById('puzzleSuccess').classList.remove('show');
+        document.getElementById('puzzleError').classList.remove('show');
+        
+        // Show the overlay
+        document.getElementById('puzzleOverlay').style.display = 'block';
+        
+        // Focus on input
+        setTimeout(() => {
+            document.getElementById('puzzleInput').focus();
+        }, 100);
+        
+        // Store current puzzle room for submission
+        this.currentPuzzleRoom = roomId;
+        
+        console.log(`💻 Opened cybersecurity puzzle for ${roomId}:`, puzzle.title);
+    }
+
+    setupPuzzleEventListeners() {
+        const overlay = document.getElementById('puzzleOverlay');
+        const submitBtn = document.getElementById('puzzleSubmit');
+        const hintBtn = document.getElementById('puzzleHintBtn');
+        const closeBtn = document.getElementById('puzzleClose');
+        const input = document.getElementById('puzzleInput');
+        
+        // Submit button
+        submitBtn.addEventListener('click', () => this.submitPuzzleAnswer());
+        
+        // Hint button
+        hintBtn.addEventListener('click', () => this.showPuzzleHint());
+        
+        // Close button
+        closeBtn.addEventListener('click', () => this.closePuzzleOverlay());
+        
+        // Enter key submission
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                this.submitPuzzleAnswer();
+            }
+        });
+        
+        // Close on overlay click (outside container)
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                this.closePuzzleOverlay();
+            }
+        });
+        
+        // Escape key to close
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && overlay.style.display === 'block') {
+                this.closePuzzleOverlay();
+            }
+        });
+    }
+
+    submitPuzzleAnswer() {
+        const input = document.getElementById('puzzleInput');
+        const answer = input.value.trim().toLowerCase();
+        const puzzle = this.computerPuzzles.get(this.currentPuzzleRoom);
+        
+        if (!puzzle) return;
+        
+        // Hide previous feedback
+        document.getElementById('puzzleHint').classList.remove('show');
+        document.getElementById('puzzleSuccess').classList.remove('show');
+        document.getElementById('puzzleError').classList.remove('show');
+        
+        if (answer === puzzle.answer.toLowerCase()) {
+            // Correct answer
+            this.solvedPuzzles.add(this.currentPuzzleRoom);
+            puzzle.solved = true;
+            
+            // Show success
+            document.getElementById('puzzleSuccess').classList.add('show');
+            
+            // Update computer visual state
+            const computerElement = document.getElementById(`computer-${this.currentPuzzleRoom}`);
+            if (computerElement) {
+                computerElement.style.borderColor = '#27ae60';
+                computerElement.style.boxShadow = '0 0 15px rgba(39, 174, 96, 0.6)';
+                computerElement.title = 'Computer accessed successfully';
+            }
+            
+            // Close after delay
+            setTimeout(() => {
+                this.closePuzzleOverlay();
+                this.showNotification(`${puzzle.title} completed! Computer access granted.`, 'success');
+            }, 2000);
+            
+            console.log(`✅ Puzzle solved for room ${this.currentPuzzleRoom}`);
+        } else {
+            // Wrong answer
+            document.getElementById('puzzleError').classList.add('show');
+            input.value = '';
+            
+            setTimeout(() => {
+                document.getElementById('puzzleError').classList.remove('show');
+            }, 3000);
+        }
+    }
+
+    showPuzzleHint() {
+        const puzzle = this.computerPuzzles.get(this.currentPuzzleRoom);
+        if (!puzzle) return;
+        
+        const hintElement = document.getElementById('puzzleHint');
+        hintElement.textContent = `💡 Hint: ${puzzle.hint}`;
+        hintElement.classList.add('show');
+    }
+
+    closePuzzleOverlay() {
+        document.getElementById('puzzleOverlay').style.display = 'none';
+        this.currentPuzzleRoom = null;
     }
 
     // Game rendering
@@ -1304,6 +1476,9 @@ class EscapeRoomGame {
         this.renderRoomBoundaries();
         this.renderDoors();
         
+        // Add computers to all rooms
+        this.renderComputers();
+        
         console.log('🎮 Game objects initialized for room:', this.currentRoom);
     }
     
@@ -1541,6 +1716,107 @@ class EscapeRoomGame {
         }
     }
     
+    renderComputers() {
+        const gameWorld = document.getElementById('gameWorld');
+        if (!gameWorld) return;
+        
+        // Remove existing computers
+        const existingComputers = gameWorld.querySelectorAll('.game-object.computer');
+        existingComputers.forEach(computer => computer.remove());
+        
+        // Add a computer to each room
+        for (const [roomId, roomData] of this.rooms) {
+            const room = roomData.bounds;
+            
+            // Position computer in a good spot in each room (avoiding doors)
+            let computerX, computerY;
+            
+            switch (roomId) {
+                case 'NW': // Top-left room
+                    computerX = room.x + room.width - 60; // Near right wall
+                    computerY = room.y + 40; // Away from top
+                    break;
+                case 'SW': // Bottom-left room
+                    computerX = room.x + 40; // Near left wall
+                    computerY = room.y + 40; // Away from top
+                    break;
+                case 'SE': // Bottom-right room
+                    computerX = room.x + 40; // Near left wall
+                    computerY = room.y + room.height - 80; // Near bottom
+                    break;
+                case 'NE': // Top-right room (final room)
+                    computerX = room.x + room.width / 2 - 15; // Center horizontally
+                    computerY = room.y + room.height / 2 - 15; // Center vertically
+                    break;
+                default:
+                    computerX = room.x + room.width / 2 - 15;
+                    computerY = room.y + room.height / 2 - 15;
+            }
+            
+            const computerElement = document.createElement('div');
+            computerElement.className = 'game-object computer';
+            computerElement.id = `computer-${roomId}`;
+            computerElement.style.position = 'absolute';
+            computerElement.style.left = computerX + 'px';
+            computerElement.style.top = computerY + 'px';
+            computerElement.style.zIndex = '50';
+            
+            // Store computer data
+            computerElement.dataset.roomId = roomId;
+            computerElement.dataset.interactable = 'true';
+            
+            // Add click handler for computer interaction
+            computerElement.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const distance = this.getDistance(this.currentPosition, {
+                    x: computerX + 15, // Computer center
+                    y: computerY + 15
+                });
+                
+                if (distance <= 30) { // 30 pixels interaction range
+                    this.openComputerPuzzle(roomId);
+                } else {
+                    this.showNotification('Move closer to interact with the computer', 'info');
+                }
+            });
+            
+            // Add hover effects
+            computerElement.addEventListener('mouseenter', () => {
+                const distance = this.getDistance(this.currentPosition, {
+                    x: computerX + 15,
+                    y: computerY + 15
+                });
+                
+                if (distance <= 30) {
+                    computerElement.classList.add('interactable');
+                    computerElement.title = 'Press E or click to access computer';
+                } else {
+                    computerElement.title = 'Move closer to interact';
+                }
+            });
+            
+            computerElement.addEventListener('mouseleave', () => {
+                computerElement.classList.remove('interactable');
+            });
+            
+            // Store in game objects for interaction checking
+            this.gameObjects.set(`computer-${roomId}`, {
+                id: `computer-${roomId}`,
+                type: 'computer',
+                x: computerX,
+                y: computerY,
+                width: 30,
+                height: 30,
+                interactable: true,
+                proximity: 30, // 30 pixel interaction range
+                roomId: roomId
+            });
+            
+            gameWorld.appendChild(computerElement);
+            console.log(`💻 Computer added to ${roomData.name} at (${computerX}, ${computerY})`);
+        }
+    }
+    
     changeRoom(newRoom) {
         console.log('🚪 Changing room from', this.currentRoom, 'to', newRoom);
         
@@ -1556,6 +1832,7 @@ class EscapeRoomGame {
         // Re-render everything for the new room
         this.renderRoomBoundaries();
         this.renderDoors();
+        this.renderComputers(); // Add computers to new room
         this.renderPlayers();
         
         console.log('🚪 Now in room:', newRoom, 'at position:', this.currentPosition);
@@ -2356,6 +2633,47 @@ class EscapeRoomGame {
         });
         
         console.log('🏠 Rooms setup complete:', this.rooms);
+    }
+
+    initializePuzzles() {
+        // Cybersecurity riddles for each room
+        this.computerPuzzles.set('NW', {
+            title: 'Network Fundamentals',
+            subtitle: 'Basic Networking Challenge',
+            riddle: 'I am a protocol that ensures reliable delivery of data packets across networks. I use a three-way handshake to establish connections and guarantees that data arrives in the correct order. What am I?',
+            answer: 'tcp',
+            hint: 'Think about the transport layer protocol that provides connection-oriented communication.',
+            solved: false
+        });
+
+        this.computerPuzzles.set('SW', {
+            title: 'Cryptography Basics',
+            subtitle: 'Encryption Challenge',
+            riddle: 'I am a type of encryption where the same key is used for both encryption and decryption. I am fast but require a secure way to share my key. Caesar cipher is a simple example of my type. What am I called?',
+            answer: 'symmetric',
+            hint: 'This encryption method uses identical keys for both encryption and decryption processes.',
+            solved: false
+        });
+
+        this.computerPuzzles.set('SE', {
+            title: 'Security Protocols',
+            subtitle: 'Web Security Challenge',
+            riddle: 'I am a security protocol that protects web traffic. I use certificates to verify identity and encrypt data between browsers and servers. My predecessor was called SSL. What am I?',
+            answer: 'tls',
+            hint: 'This protocol ensures secure communication over the internet and is the successor to SSL.',
+            solved: false
+        });
+
+        this.computerPuzzles.set('NE', {
+            title: 'Cybersecurity Defense',
+            subtitle: 'Final Security Challenge',
+            riddle: 'I am a security system that monitors network traffic and blocks suspicious activities based on predetermined rules. I can be hardware or software-based and act as a barrier between trusted and untrusted networks. What am I?',
+            answer: 'firewall',
+            hint: 'Think of a security barrier that controls incoming and outgoing network traffic.',
+            solved: false
+        });
+
+        console.log('🔐 Cybersecurity puzzles initialized:', this.computerPuzzles);
     }
 }
 

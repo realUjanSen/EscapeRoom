@@ -407,5 +407,40 @@
             }
         });
     </script>
+
+    <!-- Cybersecurity Puzzle Overlay -->
+    <div id="puzzleOverlay" class="puzzle-overlay">
+        <div class="puzzle-container">
+            <div class="puzzle-header">
+                <h2 class="puzzle-title" id="puzzleTitle">Cybersecurity Challenge</h2>
+                <p class="puzzle-subtitle" id="puzzleSubtitle">Solve the riddle to gain access</p>
+            </div>
+            
+            <div class="puzzle-content">
+                <div class="puzzle-riddle" id="puzzleRiddle">
+                    <!-- Riddle content will be inserted here -->
+                </div>
+                
+                <div class="puzzle-input-section">
+                    <input type="text" id="puzzleInput" class="puzzle-input" placeholder="Enter your answer...">
+                    <div class="puzzle-hint" id="puzzleHint">
+                        <!-- Hint content will be inserted here -->
+                    </div>
+                    <div class="puzzle-success" id="puzzleSuccess">
+                        🎉 Correct! You've gained access to the system.
+                    </div>
+                    <div class="puzzle-error" id="puzzleError">
+                        ❌ Incorrect answer. Try again.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="puzzle-buttons">
+                <button id="puzzleSubmit" class="puzzle-btn submit">Submit</button>
+                <button id="puzzleHintBtn" class="puzzle-btn" style="background: linear-gradient(45deg, #f39c12, #e67e22);">Hint</button>
+                <button id="puzzleClose" class="puzzle-btn close">Close</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
