@@ -1870,7 +1870,7 @@ class EscapeRoomGame {
                     decorationPositions = [
                         { type: 'sofa', x: room.x + 15, y: room.y + 80 },    // Left wall, mid
                         { type: 'sofa', x: room.x + 15, y: room.y + 180 },   // Left wall, bottom
-                        { type: 'plant', x: room.x + 320, y: room.y + 15 },  // Top wall, right
+                        { type: 'plant', x: room.x + 330, y: room.y + 110 },  // Top wall, right
                         { type: 'plant', x: room.x + 320, y: room.y + 200 }  // Bottom wall, right
                     ];
                     break;
