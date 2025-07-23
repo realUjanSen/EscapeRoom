@@ -48,10 +48,16 @@ class EscapeRoomGame {
             position: { x: 0, y: 0 },
             lastMoveTime: 0,
             moveDirection: { x: 0, y: 0 },
-            speed: 1,
+            speed: 2, // Increased speed for faster movement
             changeDirectionInterval: 2000, // Change direction every 2 seconds
-            lastDirectionChange: 0
+            lastDirectionChange: 0,
+            wakeUpTime: 0, // Track when the guard woke up
+            gracePeriod: 1000 // 1 second grace period after waking up
         };
+        
+        // Player death system
+        this.isDead = false;
+        this.deathPosition = { x: 0, y: 0 };
         
         // Game world dimensions (fixed size that scales to fit screen)
         this.GAME_WORLD_WIDTH = 800;
@@ -445,6 +451,9 @@ class EscapeRoomGame {
     }
 
     updatePlayerMovement() {
+        // Dead players cannot move
+        if (this.isDead) return;
+        
         // Allow movement even if game not officially started for testing
         const now = Date.now();
         if (now - this.lastMoveTime < this.moveThrottle) return;
@@ -720,6 +729,12 @@ class EscapeRoomGame {
     }
 
     handleInteraction() {
+        // Dead players cannot interact
+        if (this.isDead) {
+            this.showNotification('💀 You cannot interact while dead. You are spectating.', 'error');
+            return;
+        }
+        
         // Debounce mechanism to prevent rapid repeated interactions
         const now = Date.now();
         if (now - this.lastInteractionTime < this.interactionCooldown) {
@@ -1144,6 +1159,7 @@ class EscapeRoomGame {
             if (distance <= 50) {
                 console.log('👮 Guard woke up! Player detected within 50px');
                 this.guard.isAwake = true;
+                this.guard.wakeUpTime = now; // Record when the guard woke up
                 this.guard.lastDirectionChange = now;
                 this.renderGuard(); // Re-render with awake image
             }
@@ -1174,10 +1190,10 @@ class EscapeRoomGame {
             const proposedPosition = { x: newX, y: newY };
             
             // Room boundaries (with guard size)
-            const minX = room.x + 20; // Guard width/2
-            const minY = room.y + 25; // Guard height/2
-            const maxX = room.x + room.width - 20;
-            const maxY = room.y + room.height - 25;
+            const minX = room.x + 30; // Guard width/2 (60/2)
+            const minY = room.y + 37; // Guard height/2 (75/2)
+            const maxX = room.x + room.width - 30;
+            const maxY = room.y + room.height - 37;
             
             // Check if new position is within room bounds
             let validX = newX >= minX && newX <= maxX;
@@ -1186,10 +1202,10 @@ class EscapeRoomGame {
             // Check collision with decorations and other solid objects
             if (validX && validY) {
                 const guardRect = {
-                    x: newX - 20,
-                    y: newY - 25,
-                    width: 40,
-                    height: 50
+                    x: newX - 30,
+                    y: newY - 37,
+                    width: 60,
+                    height: 75
                 };
                 
                 for (const [objectId, gameObject] of this.gameObjects) {
@@ -1233,8 +1249,94 @@ class EscapeRoomGame {
                 guardElement.style.top = this.guard.position.y + 'px';
             }
             
+            // Check for collision with player (death condition)
+            if (!this.isDead && this.currentRoom === 'SE') {
+                // Only check for death after grace period has passed
+                const timeSinceWakeUp = now - this.guard.wakeUpTime;
+                if (timeSinceWakeUp > this.guard.gracePeriod) {
+                    const playerRect = { 
+                        x: this.currentPosition.x - 10, 
+                        y: this.currentPosition.y - 10, 
+                        width: 20, 
+                        height: 20 
+                    };
+                    
+                    const guardRect = {
+                        x: this.guard.position.x - 30,
+                        y: this.guard.position.y - 37,
+                        width: 60,
+                        height: 75
+                    };
+                    
+                    if (this.rectanglesCollide(guardRect, playerRect)) {
+                        this.handlePlayerDeath();
+                    }
+                }
+            }
+            
             this.guard.lastMoveTime = now;
         }
+    }
+    
+    handlePlayerDeath() {
+        if (this.isDead) return; // Already dead
+        
+        console.log('💀 Player has been caught by the guard!');
+        
+        // Mark player as dead
+        this.isDead = true;
+        this.deathPosition = { ...this.currentPosition };
+        
+        // Show death notification
+        this.showNotification('💀 You were caught by the guard! You are now spectating.', 'error', 5000);
+        
+        // Re-render player as skull
+        this.renderPlayers();
+        
+        // Create death overlay message
+        this.showDeathOverlay();
+    }
+    
+    showDeathOverlay() {
+        // Remove any existing death overlay
+        const existingOverlay = document.getElementById('deathOverlay');
+        if (existingOverlay) {
+            existingOverlay.remove();
+        }
+        
+        // Create death overlay
+        const deathOverlay = document.createElement('div');
+        deathOverlay.id = 'deathOverlay';
+        deathOverlay.style.position = 'fixed';
+        deathOverlay.style.top = '20px';
+        deathOverlay.style.left = '50%';
+        deathOverlay.style.transform = 'translateX(-50%)';
+        deathOverlay.style.background = 'rgba(0, 0, 0, 0.9)';
+        deathOverlay.style.color = '#ff4444';
+        deathOverlay.style.padding = '20px 40px';
+        deathOverlay.style.borderRadius = '10px';
+        deathOverlay.style.border = '2px solid #ff4444';
+        deathOverlay.style.fontSize = '24px';
+        deathOverlay.style.fontWeight = 'bold';
+        deathOverlay.style.textAlign = 'center';
+        deathOverlay.style.zIndex = '10000';
+        deathOverlay.style.boxShadow = '0 0 20px rgba(255, 68, 68, 0.5)';
+        deathOverlay.style.animation = 'fadeIn 0.5s ease-in';
+        
+        deathOverlay.innerHTML = `
+            <div style="font-size: 48px; margin-bottom: 10px;">💀</div>
+            <div>YOU DIED</div>
+            <div style="font-size: 16px; margin-top: 10px; color: #ccc;">You are now spectating. Watch other players continue the escape!</div>
+        `;
+        
+        document.body.appendChild(deathOverlay);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (deathOverlay && deathOverlay.parentNode) {
+                deathOverlay.remove();
+            }
+        }, 5000);
     }
     
     rectanglesCollide(rect1, rect2) {
@@ -1287,7 +1389,7 @@ class EscapeRoomGame {
         const existingPlayers = gameWorld.querySelectorAll('.player');
         existingPlayers.forEach(player => player.remove());
 
-        // Render current player as a red dot
+        // Render current player as a red dot or skull if dead
         const currentPlayerElement = document.createElement('div');
         currentPlayerElement.className = 'player current-player';
         currentPlayerElement.id = 'currentPlayer';
@@ -1296,15 +1398,33 @@ class EscapeRoomGame {
         currentPlayerElement.style.position = 'absolute';
         currentPlayerElement.style.left = '0px';
         currentPlayerElement.style.top = '0px';
-        currentPlayerElement.style.transform = `translate(${this.currentPosition.x - 10}px, ${this.currentPosition.y - 10}px)`;
-        currentPlayerElement.style.width = '20px';
-        currentPlayerElement.style.height = '20px';
-        currentPlayerElement.style.backgroundColor = '#e74c3c'; // Red for current player
-        currentPlayerElement.style.border = '2px solid #fff';
-        currentPlayerElement.style.borderRadius = '50%';
-        currentPlayerElement.style.boxSizing = 'border-box';
-        currentPlayerElement.style.zIndex = '100';
-        currentPlayerElement.style.transition = 'transform 0.05s linear'; // Smooth movement
+        
+        if (this.isDead) {
+            // Render as skull emoji if dead, keep position at death location
+            currentPlayerElement.style.transform = `translate(${this.deathPosition.x - 10}px, ${this.deathPosition.y - 10}px)`;
+            currentPlayerElement.style.width = '20px';
+            currentPlayerElement.style.height = '20px';
+            currentPlayerElement.style.backgroundColor = 'transparent';
+            currentPlayerElement.style.border = 'none';
+            currentPlayerElement.style.borderRadius = '0';
+            currentPlayerElement.style.fontSize = '18px';
+            currentPlayerElement.style.textAlign = 'center';
+            currentPlayerElement.style.lineHeight = '20px';
+            currentPlayerElement.style.boxSizing = 'border-box';
+            currentPlayerElement.style.zIndex = '100';
+            currentPlayerElement.textContent = '💀';
+        } else {
+            // Normal red dot for living player
+            currentPlayerElement.style.transform = `translate(${this.currentPosition.x - 10}px, ${this.currentPosition.y - 10}px)`;
+            currentPlayerElement.style.width = '20px';
+            currentPlayerElement.style.height = '20px';
+            currentPlayerElement.style.backgroundColor = '#e74c3c'; // Red for current player
+            currentPlayerElement.style.border = '2px solid #fff';
+            currentPlayerElement.style.borderRadius = '50%';
+            currentPlayerElement.style.boxSizing = 'border-box';
+            currentPlayerElement.style.zIndex = '100';
+            currentPlayerElement.style.transition = 'transform 0.05s linear'; // Smooth movement
+        }
         
         gameWorld.appendChild(currentPlayerElement);
         
@@ -1486,6 +1606,16 @@ class EscapeRoomGame {
         this.gameObjects.clear();
         this.inventory = [];
         this.currentPosition = { x: 100, y: 100 };
+        
+        // Reset death state
+        this.isDead = false;
+        this.deathPosition = { x: 0, y: 0 };
+        
+        // Remove any death overlay
+        const deathOverlay = document.getElementById('deathOverlay');
+        if (deathOverlay) {
+            deathOverlay.remove();
+        }
         
         // Reset all players positions
         this.players.forEach(player => {
@@ -2120,8 +2250,8 @@ class EscapeRoomGame {
         guardElement.style.position = 'absolute';
         guardElement.style.left = this.guard.position.x + 'px';
         guardElement.style.top = this.guard.position.y + 'px';
-        guardElement.style.width = '40px';
-        guardElement.style.height = '50px';
+        guardElement.style.width = '60px';
+        guardElement.style.height = '75px';
         guardElement.style.zIndex = '60';
         guardElement.style.transition = 'all 0.3s ease';
         
@@ -2138,8 +2268,8 @@ class EscapeRoomGame {
             type: 'guard',
             x: this.guard.position.x,
             y: this.guard.position.y,
-            width: 40,
-            height: 50,
+            width: 60,
+            height: 75,
             solid: true, // Guard blocks movement
             interactable: false,
             roomId: 'SE'
@@ -2409,6 +2539,9 @@ class EscapeRoomGame {
     handleGameClick(e) {
         console.log('🔍 DEBUG: handleGameClick called', e);
         
+        // Dead players cannot move by clicking
+        if (this.isDead) return;
+        
         // Handle game world clicks for click-to-move
         const gameWorld = document.getElementById('gameWorld');
         if (!gameWorld) return;
@@ -2444,6 +2577,9 @@ class EscapeRoomGame {
     handleTouchEnd(e) {
         console.log('🔍 DEBUG: handleTouchEnd called');
         e.preventDefault();
+        
+        // Dead players cannot move by touching
+        if (this.isDead) return;
         
         const touchEndTime = Date.now();
         const touchDuration = touchEndTime - this.touchStartTime;
