@@ -1868,34 +1868,34 @@ class EscapeRoomGame {
             switch (roomId) {
                 case 'NW': // Top-left room (computer at right side)
                     decorationPositions = [
-                        { type: 'sofa', x: room.x + 30, y: room.y + 120 },   // Left side, mid
-                        { type: 'sofa', x: room.x + 200, y: room.y + 200 },  // Center-bottom
-                        { type: 'plant', x: room.x + 50, y: room.y + 30 },   // Top-left corner
-                        { type: 'plant', x: room.x + 300, y: room.y + 180 }  // Bottom-right (away from computer)
+                        { type: 'sofa', x: room.x + 15, y: room.y + 80 },    // Left wall, mid
+                        { type: 'sofa', x: room.x + 15, y: room.y + 180 },   // Left wall, bottom
+                        { type: 'plant', x: room.x + 320, y: room.y + 15 },  // Top wall, right
+                        { type: 'plant', x: room.x + 320, y: room.y + 200 }  // Bottom wall, right
                     ];
                     break;
                 case 'SW': // Bottom-left room (computer at left side)
                     decorationPositions = [
-                        { type: 'sofa', x: room.x + 200, y: room.y + 30 },   // Right side, top
-                        { type: 'sofa', x: room.x + 280, y: room.y + 160 },  // Right side, bottom
-                        { type: 'plant', x: room.x + 120, y: room.y + 100 }, // Center
-                        { type: 'plant', x: room.x + 320, y: room.y + 200 }  // Bottom-right corner
+                        { type: 'sofa', x: room.x + 310, y: room.y + 15 },   // Top wall, right
+                        { type: 'sofa', x: room.x + 310, y: room.y + 180 },  // Bottom wall, right
+                        { type: 'plant', x: room.x + 150, y: room.y + 15 },  // Top wall, center
+                        { type: 'plant', x: room.x + 15, y: room.y + 200 }   // Bottom wall, left
                     ];
                     break;
                 case 'SE': // Bottom-right room (computer at left side, bottom)
                     decorationPositions = [
-                        { type: 'sofa', x: room.x + 200, y: room.y + 30 },   // Right side, top
-                        { type: 'sofa', x: room.x + 300, y: room.y + 120 },  // Right side, mid
-                        { type: 'plant', x: room.x + 80, y: room.y + 60 },   // Left side, top
-                        { type: 'plant', x: room.x + 150, y: room.y + 180 }  // Center, bottom (away from computer)
+                        { type: 'sofa', x: room.x + 310, y: room.y + 15 },   // Top wall, right
+                        { type: 'sofa', x: room.x + 310, y: room.y + 80 },   // Right wall, mid
+                        { type: 'plant', x: room.x + 15, y: room.y + 15 },   // Top wall, left
+                        { type: 'plant', x: room.x + 200, y: room.y + 200 }  // Bottom wall, center
                     ];
                     break;
                 case 'NE': // Top-right room (computer at center, master door at top)
                     decorationPositions = [
-                        { type: 'sofa', x: room.x + 50, y: room.y + 150 },   // Left side, bottom
-                        { type: 'sofa', x: room.x + 280, y: room.y + 180 },  // Right side, bottom
-                        { type: 'plant', x: room.x + 60, y: room.y + 60 },   // Left side, top
-                        { type: 'plant', x: room.x + 300, y: room.y + 120 }  // Right side, mid
+                        { type: 'sofa', x: room.x + 15, y: room.y + 180 },   // Bottom wall, left
+                        { type: 'sofa', x: room.x + 250, y: room.y + 200 },  // Bottom wall, right
+                        { type: 'plant', x: room.x + 15, y: room.y + 80 },   // Left wall, mid
+                        { type: 'plant', x: room.x + 320, y: room.y + 140 }  // Right wall, bottom
                     ];
                     break;
             }
