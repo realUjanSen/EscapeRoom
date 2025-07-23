@@ -716,7 +716,38 @@ class EscapeRoomGame {
         }
         this.lastInteractionTime = now;
         
-        // Check for nearby doors first (E key functionality)
+        // Check for computers FIRST (higher priority than doors)
+        const nearbyComputer = this.findNearbyComputer();
+        if (nearbyComputer) {
+            this.openComputerPuzzle(nearbyComputer.roomId);
+            return;
+        }
+        
+        // Check for master door in NE room
+        if (this.currentRoom === 'NE') {
+            const masterDoor = document.getElementById('master-door');
+            if (masterDoor) {
+                const masterDoorRect = masterDoor.getBoundingClientRect();
+                const gameWorld = document.getElementById('gameWorld');
+                const gameWorldRect = gameWorld.getBoundingClientRect();
+                
+                // Convert to game world coordinates
+                const masterDoorX = parseInt(masterDoor.style.left) + 40; // Center of door
+                const masterDoorY = parseInt(masterDoor.style.top) + 7;
+                
+                const distance = this.getDistance(this.currentPosition, {
+                    x: masterDoorX,
+                    y: masterDoorY
+                });
+                
+                if (distance <= 35) { // 35 pixel range for master door
+                    this.handleMasterDoorClick();
+                    return;
+                }
+            }
+        }
+        
+        // Then check for nearby doors
         const nearbyDoor = this.findNearbyDoor();
         if (nearbyDoor) {
             // Use door element if provided, otherwise find it
@@ -738,13 +769,6 @@ class EscapeRoomGame {
             } else {
                 console.error('🚪 Could not find door element for door to room:', nearbyDoor.targetRoom);
             }
-        }
-        
-        // If no doors nearby, check for computers and other interactable objects
-        const nearbyComputer = this.findNearbyComputer();
-        if (nearbyComputer) {
-            this.openComputerPuzzle(nearbyComputer.roomId);
-            return;
         }
         
         // Check for other game objects if we add them later
@@ -782,7 +806,7 @@ class EscapeRoomGame {
     }
     
     findNearbyDoor() {
-        const interactionRange = 100; // Increased range for doors to make keyboard interaction easier
+        const interactionRange = 40; // Reduced from 100 to 40 pixels for doors
         const currentRoomData = this.rooms.get(this.currentRoom);
         if (!currentRoomData) return null;
         
@@ -998,6 +1022,9 @@ class EscapeRoomGame {
             setTimeout(() => {
                 this.closePuzzleOverlay();
                 this.showNotification(`${puzzle.title} completed! Computer access granted.`, 'success');
+                
+                // Re-render master door in case this was the last puzzle
+                this.renderMasterDoor();
             }, 2000);
             
             console.log(`✅ Puzzle solved for room ${this.currentPuzzleRoom}`);
@@ -1479,6 +1506,9 @@ class EscapeRoomGame {
         // Add computers to all rooms
         this.renderComputers();
         
+        // Add master door if in NE room
+        this.renderMasterDoor();
+        
         console.log('🎮 Game objects initialized for room:', this.currentRoom);
     }
     
@@ -1817,6 +1847,207 @@ class EscapeRoomGame {
         }
     }
     
+    renderMasterDoor() {
+        const gameWorld = document.getElementById('gameWorld');
+        if (!gameWorld) return;
+        
+        // Remove existing master door
+        const existingMasterDoor = gameWorld.querySelector('.master-door');
+        if (existingMasterDoor) {
+            existingMasterDoor.remove();
+        }
+        
+        // Only add master door in NE room
+        const neRoom = this.rooms.get('NE');
+        if (!neRoom || this.currentRoom !== 'NE') return;
+        
+        const room = neRoom.bounds;
+        
+        // Position master door on the top wall (exit to freedom)
+        const doorX = room.x + room.width / 2 - 40; // Wider door
+        const doorY = room.y - 5; // Slightly outside the room boundary
+        const doorWidth = 80;
+        const doorHeight = 15;
+        
+        const masterDoorElement = document.createElement('div');
+        masterDoorElement.className = 'master-door';
+        masterDoorElement.id = 'master-door';
+        masterDoorElement.style.position = 'absolute';
+        masterDoorElement.style.left = doorX + 'px';
+        masterDoorElement.style.top = doorY + 'px';
+        masterDoorElement.style.width = doorWidth + 'px';
+        masterDoorElement.style.height = doorHeight + 'px';
+        masterDoorElement.style.zIndex = '15';
+        masterDoorElement.style.cursor = 'pointer';
+        masterDoorElement.style.transition = 'all 0.3s ease';
+        
+        // Check if all puzzles are solved
+        const allPuzzlesSolved = this.solvedPuzzles.size >= 4;
+        
+        if (allPuzzlesSolved) {
+            // Unlocked master door
+            masterDoorElement.style.backgroundColor = '#27ae60';
+            masterDoorElement.style.border = '3px solid #2ecc71';
+            masterDoorElement.style.boxShadow = '0 0 20px rgba(39, 174, 96, 0.8)';
+            masterDoorElement.title = 'EXIT - All puzzles completed! Click to escape!';
+            masterDoorElement.dataset.isUnlocked = 'true';
+        } else {
+            // Locked master door
+            masterDoorElement.style.backgroundColor = '#e74c3c';
+            masterDoorElement.style.border = '3px solid #c0392b';
+            masterDoorElement.style.boxShadow = '0 0 20px rgba(231, 76, 60, 0.8)';
+            masterDoorElement.title = `LOCKED - Complete all ${4 - this.solvedPuzzles.size} remaining puzzles to unlock`;
+            masterDoorElement.dataset.isUnlocked = 'false';
+        }
+        
+        // Add lock icon
+        const lockIcon = document.createElement('div');
+        lockIcon.style.position = 'absolute';
+        lockIcon.style.top = '50%';
+        lockIcon.style.left = '50%';
+        lockIcon.style.transform = 'translate(-50%, -50%)';
+        lockIcon.style.fontSize = '12px';
+        lockIcon.style.color = '#fff';
+        lockIcon.style.fontWeight = 'bold';
+        lockIcon.textContent = allPuzzlesSolved ? '🚪' : '🔒';
+        masterDoorElement.appendChild(lockIcon);
+        
+        // Add click handler
+        masterDoorElement.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.handleMasterDoorClick();
+        });
+        
+        // Add hover effects
+        masterDoorElement.addEventListener('mouseenter', () => {
+            if (allPuzzlesSolved) {
+                masterDoorElement.style.transform = 'scale(1.05)';
+                masterDoorElement.style.boxShadow = '0 0 30px rgba(39, 174, 96, 1)';
+            } else {
+                masterDoorElement.style.transform = 'scale(1.02)';
+            }
+        });
+        
+        masterDoorElement.addEventListener('mouseleave', () => {
+            masterDoorElement.style.transform = 'scale(1)';
+            if (allPuzzlesSolved) {
+                masterDoorElement.style.boxShadow = '0 0 20px rgba(39, 174, 96, 0.8)';
+            }
+        });
+        
+        gameWorld.appendChild(masterDoorElement);
+        console.log(`🚪 Master door rendered in NE room - Status: ${allPuzzlesSolved ? 'UNLOCKED' : 'LOCKED'} (${this.solvedPuzzles.size}/4 puzzles solved)`);
+    }
+    
+    handleMasterDoorClick() {
+        const allPuzzlesSolved = this.solvedPuzzles.size >= 4;
+        
+        if (allPuzzlesSolved) {
+            // Player has completed all puzzles - they can escape!
+            this.showGameCompletionModal();
+        } else {
+            // Door is locked
+            const remaining = 4 - this.solvedPuzzles.size;
+            this.showNotification(`🔒 Master door is locked! Complete ${remaining} more puzzle${remaining > 1 ? 's' : ''} to unlock.`, 'error');
+        }
+    }
+    
+    showGameCompletionModal() {
+        // Create a completion overlay
+        const completionOverlay = document.createElement('div');
+        completionOverlay.id = 'gameCompletionOverlay';
+        completionOverlay.style.position = 'fixed';
+        completionOverlay.style.top = '0';
+        completionOverlay.style.left = '0';
+        completionOverlay.style.width = '100vw';
+        completionOverlay.style.height = '100vh';
+        completionOverlay.style.background = 'rgba(0, 0, 0, 0.95)';
+        completionOverlay.style.display = 'flex';
+        completionOverlay.style.alignItems = 'center';
+        completionOverlay.style.justifyContent = 'center';
+        completionOverlay.style.zIndex = '20000';
+        completionOverlay.style.animation = 'fadeIn 0.5s ease-in';
+        
+        const completionContent = document.createElement('div');
+        completionContent.style.background = 'linear-gradient(135deg, #1a1a2e, #16213e)';
+        completionContent.style.border = '3px solid #27ae60';
+        completionContent.style.borderRadius = '20px';
+        completionContent.style.padding = '40px';
+        completionContent.style.textAlign = 'center';
+        completionContent.style.maxWidth = '600px';
+        completionContent.style.boxShadow = '0 20px 60px rgba(0, 0, 0, 0.8)';
+        completionContent.style.animation = 'slideInUp 0.6s ease-out';
+        
+        completionContent.innerHTML = `
+            <div style="font-size: 4rem; margin-bottom: 20px;">🎉</div>
+            <h1 style="color: #27ae60; font-size: 2.5rem; margin-bottom: 20px;">CONGRATULATIONS!</h1>
+            <h2 style="color: #3498db; font-size: 1.5rem; margin-bottom: 30px;">You've successfully escaped the Cybersecurity Challenge!</h2>
+            <p style="color: #ecf0f1; font-size: 1.2rem; margin-bottom: 30px; line-height: 1.6;">
+                You have demonstrated mastery of key cybersecurity concepts including:
+                <br><br>
+                🔹 Network Fundamentals (TCP)<br>
+                🔹 Cryptography (Symmetric Encryption)<br>
+                🔹 Security Protocols (TLS)<br>
+                🔹 Cybersecurity Defense (Firewall)<br>
+            </p>
+            <div style="margin-top: 30px;">
+                <button id="playAgainBtn" style="
+                    background: linear-gradient(45deg, #27ae60, #2ecc71);
+                    color: white;
+                    border: none;
+                    padding: 15px 30px;
+                    margin: 0 10px;
+                    border-radius: 10px;
+                    font-size: 1.1rem;
+                    font-weight: bold;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                ">🔄 Play Again</button>
+                <button id="exitGameBtn" style="
+                    background: linear-gradient(45deg, #34495e, #2c3e50);
+                    color: white;
+                    border: none;
+                    padding: 15px 30px;
+                    margin: 0 10px;
+                    border-radius: 10px;
+                    font-size: 1.1rem;
+                    font-weight: bold;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                ">🚪 Exit to Menu</button>
+            </div>
+        `;
+        
+        completionOverlay.appendChild(completionContent);
+        document.body.appendChild(completionOverlay);
+        
+        // Add button event listeners
+        document.getElementById('playAgainBtn').addEventListener('click', () => {
+            this.resetGame();
+            completionOverlay.remove();
+        });
+        
+        document.getElementById('exitGameBtn').addEventListener('click', () => {
+            this.leaveRoom();
+            completionOverlay.remove();
+        });
+        
+        // Add CSS animations
+        if (!document.getElementById('gameCompletionStyles')) {
+            const styles = document.createElement('style');
+            styles.id = 'gameCompletionStyles';
+            styles.textContent = `
+                @keyframes slideInUp {
+                    from { opacity: 0; transform: translateY(50px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+        
+        console.log('🎉 Game completion modal displayed!');
+    }
+    
     changeRoom(newRoom) {
         console.log('🚪 Changing room from', this.currentRoom, 'to', newRoom);
         
@@ -1833,6 +2064,7 @@ class EscapeRoomGame {
         this.renderRoomBoundaries();
         this.renderDoors();
         this.renderComputers(); // Add computers to new room
+        this.renderMasterDoor(); // Add master door if applicable
         this.renderPlayers();
         
         console.log('🚪 Now in room:', newRoom, 'at position:', this.currentPosition);
@@ -2629,7 +2861,8 @@ class EscapeRoomGame {
         this.rooms.set('NE', { 
             name: 'Northeast Room (End)',
             bounds: { x: w, y: 0, width: w, height: h },
-            doors: ['SE'] // Only door back to SE (end room)
+            doors: ['SE'], // Only door back to SE (end room)
+            hasMasterDoor: true // Special flag for master door
         });
         
         console.log('🏠 Rooms setup complete:', this.rooms);

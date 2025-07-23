@@ -1551,3 +1551,42 @@ body {
     25% { transform: translateX(-5px); }
     75% { transform: translateX(5px); }
 }
+
+/* Master Door Styling */
+.master-door {
+    position: absolute;
+    background: linear-gradient(45deg, #e74c3c, #c0392b);
+    border: 3px solid #c0392b;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    box-shadow: 0 0 20px rgba(231, 76, 60, 0.8);
+}
+
+.master-door[data-is-unlocked="true"] {
+    background: linear-gradient(45deg, #27ae60, #2ecc71);
+    border-color: #2ecc71;
+    box-shadow: 0 0 20px rgba(39, 174, 96, 0.8);
+    animation: masterDoorPulse 2s infinite;
+}
+
+.master-door:hover {
+    transform: scale(1.05);
+}
+
+.master-door[data-is-unlocked="true"]:hover {
+    box-shadow: 0 0 30px rgba(39, 174, 96, 1);
+}
+
+@keyframes masterDoorPulse {
+    0%, 100% { 
+        box-shadow: 0 0 20px rgba(39, 174, 96, 0.8);
+    }
+    50% { 
+        box-shadow: 0 0 30px rgba(39, 174, 96, 1), 0 0 40px rgba(39, 174, 96, 0.6);
+    }
+}
