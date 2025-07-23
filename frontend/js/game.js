@@ -42,6 +42,17 @@ class EscapeRoomGame {
         this.solvedPuzzles = new Set();
         this.initializePuzzles();
         
+        // Guard system
+        this.guard = {
+            isAwake: false,
+            position: { x: 0, y: 0 },
+            lastMoveTime: 0,
+            moveDirection: { x: 0, y: 0 },
+            speed: 1,
+            changeDirectionInterval: 2000, // Change direction every 2 seconds
+            lastDirectionChange: 0
+        };
+        
         // Game world dimensions (fixed size that scales to fit screen)
         this.GAME_WORLD_WIDTH = 800;
         this.GAME_WORLD_HEIGHT = 536;
@@ -1115,9 +1126,122 @@ class EscapeRoomGame {
 
     gameLoop() {
         this.updatePlayerMovement();
+        this.updateGuard();
         this.updateCamera();
         this.render();
         requestAnimationFrame(() => this.gameLoop());
+    }
+    
+    updateGuard() {
+        // Only update guard when in SE room
+        if (this.currentRoom !== 'SE') return;
+        
+        const now = Date.now();
+        
+        // Check if player is within 50px radius to wake up the guard
+        if (!this.guard.isAwake) {
+            const distance = this.getDistance(this.currentPosition, this.guard.position);
+            if (distance <= 50) {
+                console.log('👮 Guard woke up! Player detected within 50px');
+                this.guard.isAwake = true;
+                this.guard.lastDirectionChange = now;
+                this.renderGuard(); // Re-render with awake image
+            }
+            return; // Don't move while sleeping
+        }
+        
+        // Guard movement logic (when awake)
+        const seRoom = this.rooms.get('SE');
+        if (!seRoom) return;
+        
+        const room = seRoom.bounds;
+        
+        // Change direction periodically
+        if (now - this.guard.lastDirectionChange > this.guard.changeDirectionInterval) {
+            this.guard.moveDirection = {
+                x: (Math.random() - 0.5) * 2, // Random direction between -1 and 1
+                y: (Math.random() - 0.5) * 2
+            };
+            this.guard.lastDirectionChange = now;
+        }
+        
+        // Move guard
+        if (now - this.guard.lastMoveTime > 50) { // Update every 50ms
+            const newX = this.guard.position.x + (this.guard.moveDirection.x * this.guard.speed);
+            const newY = this.guard.position.y + (this.guard.moveDirection.y * this.guard.speed);
+            
+            // Check boundaries and collision
+            const proposedPosition = { x: newX, y: newY };
+            
+            // Room boundaries (with guard size)
+            const minX = room.x + 20; // Guard width/2
+            const minY = room.y + 25; // Guard height/2
+            const maxX = room.x + room.width - 20;
+            const maxY = room.y + room.height - 25;
+            
+            // Check if new position is within room bounds
+            let validX = newX >= minX && newX <= maxX;
+            let validY = newY >= minY && newY <= maxY;
+            
+            // Check collision with decorations and other solid objects
+            if (validX && validY) {
+                const guardRect = {
+                    x: newX - 20,
+                    y: newY - 25,
+                    width: 40,
+                    height: 50
+                };
+                
+                for (const [objectId, gameObject] of this.gameObjects) {
+                    if (gameObject.solid && gameObject.roomId === 'SE' && gameObject.type !== 'guard') {
+                        if (this.rectanglesCollide(guardRect, gameObject)) {
+                            if (Math.abs(this.guard.moveDirection.x) > Math.abs(this.guard.moveDirection.y)) {
+                                validX = false; // Block horizontal movement
+                            } else {
+                                validY = false; // Block vertical movement
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // Update position and change direction if blocked
+            if (validX) {
+                this.guard.position.x = newX;
+            } else {
+                this.guard.moveDirection.x *= -1; // Reverse X direction
+            }
+            
+            if (validY) {
+                this.guard.position.y = newY;
+            } else {
+                this.guard.moveDirection.y *= -1; // Reverse Y direction
+            }
+            
+            // Update game object position
+            const guardObject = this.gameObjects.get('guard');
+            if (guardObject) {
+                guardObject.x = this.guard.position.x;
+                guardObject.y = this.guard.position.y;
+            }
+            
+            // Update DOM element position
+            const guardElement = document.getElementById('guard');
+            if (guardElement) {
+                guardElement.style.left = this.guard.position.x + 'px';
+                guardElement.style.top = this.guard.position.y + 'px';
+            }
+            
+            this.guard.lastMoveTime = now;
+        }
+    }
+    
+    rectanglesCollide(rect1, rect2) {
+        return rect1.x < rect2.x + rect2.width &&
+               rect1.x + rect1.width > rect2.x &&
+               rect1.y < rect2.y + rect2.height &&
+               rect1.y + rect1.height > rect2.y;
     }
 
     updateCamera() {
@@ -1508,6 +1632,9 @@ class EscapeRoomGame {
         
         // Add decorative items to all rooms
         this.renderDecorations();
+        
+        // Add guard to SE room
+        this.renderGuard();
         
         // Add master door if in NE room
         this.renderMasterDoor();
@@ -1912,13 +2039,18 @@ class EscapeRoomGame {
                 decorationElement.style.pointerEvents = 'none'; // Non-interactive
                 
                 // Set size based on decoration type
+                let width, height;
                 if (decoration.type === 'sofa') {
-                    decorationElement.style.width = '60px';
-                    decorationElement.style.height = '60px';
+                    width = 60;
+                    height = 60;
+                    decorationElement.style.width = width + 'px';
+                    decorationElement.style.height = height + 'px';
                     decorationElement.style.backgroundImage = 'url("assets/images/sofa light.png")';
                 } else if (decoration.type === 'plant') {
-                    decorationElement.style.width = '40px';
-                    decorationElement.style.height = '50px';
+                    width = 40;
+                    height = 50;
+                    decorationElement.style.width = width + 'px';
+                    decorationElement.style.height = height + 'px';
                     decorationElement.style.backgroundImage = 'url("assets/images/plant.webp")';
                 }
                 
@@ -1938,11 +2070,83 @@ class EscapeRoomGame {
                     decorationElement.style.opacity = '0.8';
                 });
                 
+                // Add collision object to game objects
+                this.gameObjects.set(`decoration-${roomId}-${decoration.type}-${index}`, {
+                    id: `decoration-${roomId}-${decoration.type}-${index}`,
+                    type: 'decoration',
+                    subtype: decoration.type,
+                    x: decoration.x,
+                    y: decoration.y,
+                    width: width,
+                    height: height,
+                    solid: true, // This makes it a collision object
+                    interactable: false,
+                    roomId: roomId
+                });
+                
                 gameWorld.appendChild(decorationElement);
             });
             
             console.log(`🎨 Added ${decorationPositions.length} decorations to ${roomData.name}`);
         }
+    }
+    
+    renderGuard() {
+        const gameWorld = document.getElementById('gameWorld');
+        if (!gameWorld) return;
+        
+        // Remove existing guard
+        const existingGuard = gameWorld.querySelector('.guard');
+        if (existingGuard) {
+            existingGuard.remove();
+        }
+        
+        // Only add guard to SE room
+        const seRoom = this.rooms.get('SE');
+        if (!seRoom) return;
+        
+        const room = seRoom.bounds;
+        
+        // Initialize guard position if not set
+        if (this.guard.position.x === 0 && this.guard.position.y === 0) {
+            this.guard.position.x = room.x + room.width / 2;
+            this.guard.position.y = room.y + room.height / 2 + 30; // Slightly below center
+        }
+        
+        // Create guard element
+        const guardElement = document.createElement('div');
+        guardElement.className = 'guard';
+        guardElement.id = 'guard';
+        guardElement.style.position = 'absolute';
+        guardElement.style.left = this.guard.position.x + 'px';
+        guardElement.style.top = this.guard.position.y + 'px';
+        guardElement.style.width = '40px';
+        guardElement.style.height = '50px';
+        guardElement.style.zIndex = '60';
+        guardElement.style.transition = 'all 0.3s ease';
+        
+        // Set appropriate image based on guard state
+        const imageSrc = this.guard.isAwake ? 'assets/images/awakeguard.png' : 'assets/images/sleepingguard.webp';
+        guardElement.style.backgroundImage = `url("${imageSrc}")`;
+        guardElement.style.backgroundSize = 'contain';
+        guardElement.style.backgroundRepeat = 'no-repeat';
+        guardElement.style.backgroundPosition = 'center';
+        
+        // Add collision object for the guard
+        this.gameObjects.set('guard', {
+            id: 'guard',
+            type: 'guard',
+            x: this.guard.position.x,
+            y: this.guard.position.y,
+            width: 40,
+            height: 50,
+            solid: true, // Guard blocks movement
+            interactable: false,
+            roomId: 'SE'
+        });
+        
+        gameWorld.appendChild(guardElement);
+        console.log(`👮 Guard rendered in SE room at (${this.guard.position.x}, ${this.guard.position.y}) - State: ${this.guard.isAwake ? 'AWAKE' : 'SLEEPING'}`);
     }
     
     renderMasterDoor() {
@@ -2163,6 +2367,7 @@ class EscapeRoomGame {
         this.renderDoors();
         this.renderComputers(); // Add computers to new room
         this.renderDecorations(); // Add decorations to new room
+        this.renderGuard(); // Add guard if in SE room
         this.renderMasterDoor(); // Add master door if applicable
         this.renderPlayers();
         
