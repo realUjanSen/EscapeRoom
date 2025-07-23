@@ -30,12 +30,12 @@ class EscapeRoomGame {
         this.touchStartTime = 0;
         this.touchMoved = false;
         
-        // Interaction debouncing
-        this.lastInteractionTime = 0;
-        this.interactionCooldown = 300; // 300ms cooldown between interactions
-        
         // Click/Touch destination for progressive movement
         this.destination = null;
+        
+        // Interaction debounce to prevent rapid repeated interactions
+        this.lastInteractionTime = 0;
+        this.interactionCooldown = 300; // 300ms cooldown between interactions
         
         // Game world dimensions (fixed size that scales to fit screen)
         this.GAME_WORLD_WIDTH = 800;
