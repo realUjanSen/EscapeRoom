@@ -16,9 +16,20 @@ A real-time multiplayer escape room game built for local area network (LAN) play
 ##  Quick Start
 
 ### Prerequisites
-- PHP 7.0+ installed
-- Node.js 14+ installed
-- Modern web browser
+
+**You need to install these on your system first:**
+
+1. **PHP 8.0+** (for static file server only)
+   - **Windows**: Download from [php.net](https://windows.php.net/download/) or install via [XAMPP](https://www.apachefriends.org/)
+   - **Mac**: `brew install php` or download from [php.net](https://php.net/downloads)
+   - **Linux**: `sudo apt install php` (Ubuntu/Debian) or `sudo yum install php` (CentOS/RHEL)
+   - **Verify**: Run `php --version` in terminal/command prompt
+
+2. **Node.js 16+** (for multiplayer WebSocket server)
+   - Download from [nodejs.org](https://nodejs.org/) (includes npm)
+   - **Verify**: Run `node --version` and `npm --version` in terminal
+
+3. **Modern web browser** (Chrome, Firefox, Safari, Edge)
 
 ### Installation
 
