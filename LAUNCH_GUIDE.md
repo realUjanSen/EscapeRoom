@@ -1,4 +1,4 @@
-# 🚀 Quick Launch Guide
+#  Quick Launch Guide
 
 ## Port Architecture
 - **Frontend/Backend (PHP)**: Port `3000` - Main game interface and APIs
@@ -56,7 +56,7 @@ The dropdown now shows both the adapter name and IP:
 This makes it easier to choose the right network for LAN play!
 
 ## PowerShell vs Bash Commands
-- **PowerShell (Windows)**: Use `&&` for chaining commands
-- **Bash (Linux/Mac)**: Use `;` for chaining commands
+- **PowerShell (Windows)**: Use `;` for chaining commands
+- **Bash (Linux/Mac)**: Use `&&` for chaining commands
 
 The `package.json` scripts have been updated to use PowerShell-compatible syntax.
