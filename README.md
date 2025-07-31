@@ -78,6 +78,8 @@ A real-time multiplayer escape room game built for local area network (LAN) play
     ↕              ↕
 [SW Room] ←→ [SE Room - Guard]
 ```
+<img width="1366" height="650" alt="image" src="https://github.com/user-attachments/assets/fd23e051-f715-4248-9250-577a8287d58c" />
+
 
 - **NW Room**: Starting room with first computer
 - **SW Room**: Second puzzle computer
