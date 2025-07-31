@@ -35,24 +35,12 @@ A real-time multiplayer escape room game built for local area network (LAN) play
 
 1. **Clone the repository**
    ```bash
-   # Bash/Linux/Mac
-   git clone https://github.com/realUjanSen/EscapeRoom.git
-   cd EscapeRoom
-   ```
-   ```powershell
-   # PowerShell/Windows
    git clone https://github.com/realUjanSen/EscapeRoom.git
    cd EscapeRoom
    ```
 
 2. **Install Node.js dependencies**
    ```bash
-   # Bash/Linux/Mac
-   cd ws-server
-   npm install
-   ```
-   ```powershell
-   # PowerShell/Windows
    cd ws-server
    npm install
    ```
@@ -61,22 +49,11 @@ A real-time multiplayer escape room game built for local area network (LAN) play
 
    **Terminal 1 - PHP Server:**
    ```bash
-   # Bash/Linux/Mac
-   php -S 0.0.0.0:3000
-   ```
-   ```powershell
-   # PowerShell/Windows
    php -S 0.0.0.0:3000
    ```
 
    **Terminal 2 - WebSocket Server:**
    ```bash
-   # Bash/Linux/Mac
-   cd ws-server
-   node server.js
-   ```
-   ```powershell
-   # PowerShell/Windows
    cd ws-server
    node server.js
    ```
@@ -97,7 +74,7 @@ A real-time multiplayer escape room game built for local area network (LAN) play
 ##  Game Map
 
 ```
-[NW Room] ←→ [NE Room - Master Door]
+[NW Room]    [NE Room - Master Door]
     ↕              ↕
 [SW Room] ←→ [SE Room - Guard]
 ```
